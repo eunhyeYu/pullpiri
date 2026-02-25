@@ -48,7 +48,12 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
+        let bytes = response.bytes().await?;
+        let json = if bytes.is_empty() {
+            serde_json::json!({})
+        } else {
+            serde_json::from_slice(&bytes)?
+        };
         Ok(json)
     }
 
