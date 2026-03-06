@@ -1,15 +1,16 @@
 /*
-* SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
-* SPDX-License-Identifier: Apache-2.0
-*/
-//! Command implementations for SettingsCLI
+ * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+//! Command implementations for pirictl
 
+pub mod apply;
 pub mod board;
 pub mod container;
+pub mod delete;
 pub mod metrics;
 pub mod node;
 pub mod soc;
-pub mod yaml;
 
 use crate::Result;
 use colored::Colorize;

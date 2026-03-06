@@ -17,6 +17,8 @@ pub enum CliError {
     Io(std::io::Error),
     /// Custom error messages
     Custom(String),
+    /// Invalid resource type
+    InvalidResourceType(String),
 }
 
 impl fmt::Display for CliError {
@@ -26,6 +28,13 @@ impl fmt::Display for CliError {
             CliError::Json(e) => write!(f, "JSON error: {}", e),
             CliError::Io(e) => write!(f, "IO error: {}", e),
             CliError::Custom(msg) => write!(f, "Error: {}", msg),
+            CliError::InvalidResourceType(t) => {
+                write!(
+                    f,
+                    "Invalid resource type: '{}'. Supported types: scenario, package",
+                    t
+                )
+            }
         }
     }
 }
