@@ -7,28 +7,29 @@
 
 use common::apiserver::NodeInfo;
 use common::etcd;
+use common::logd;
 use serde_json;
 use std::error::Error;
 
 /// Find a node by IP address from simplified node keys
 pub async fn find_node_by_simple_key() -> Option<String> {
-    println!("Checking simplified node keys in etcd...");
+    logd!(1, "Checking simplified node keys in etcd...");
     match etcd::get_all_with_prefix("nodes/").await {
         Ok(kvs) => {
-            println!("Found {} simplified node keys", kvs.len());
+            logd!(2, "Found {} simplified node keys", kvs.len());
             // Find first non-empty key
             for kv in kvs {
-                println!("Node key: {}", kv.0);
+                logd!(1, "Node key: {}", kv.0);
                 let ip_address = kv.0.trim_start_matches("nodes/");
                 if !ip_address.is_empty() {
-                    println!("Found node IP directly from key: {}", ip_address);
+                    logd!(1, "Found node IP directly from key: {}", ip_address);
                     return Some(ip_address.to_string());
                 }
             }
             None
         }
         Err(e) => {
-            println!("Error checking simplified nodes: {}", e);
+            logd!(5, "Error checking simplified nodes: {}", e);
             None
         }
     }
@@ -36,18 +37,18 @@ pub async fn find_node_by_simple_key() -> Option<String> {
 
 /// Find a node directly from etcd using cluster/nodes/ prefix
 pub async fn find_node_from_etcd() -> Option<String> {
-    println!("Checking cluster/nodes/ prefix in etcd...");
+    logd!(1, "Checking cluster/nodes/ prefix in etcd...");
     let kvs = match etcd::get_all_with_prefix("cluster/nodes/").await {
         Ok(kvs) => kvs,
         Err(e) => {
-            println!("Error getting nodes: {}", e);
+            logd!(5, "Error getting nodes: {}", e);
             return None;
         }
     };
 
-    println!("Found {} node entries", kvs.len());
+    logd!(2, "Found {} node entries", kvs.len());
     for kv in &kvs {
-        println!("Node entry: {}", kv.0);
+        logd!(1, "Node entry: {}", kv.0);
     }
 
     if kvs.is_empty() {
@@ -56,14 +57,17 @@ pub async fn find_node_from_etcd() -> Option<String> {
 
     match serde_json::from_str::<NodeInfo>(&kvs[0].1) {
         Ok(node) => {
-            println!(
+            logd!(
+                2,
                 "Decoded node: {} ({}), status: {}",
-                node.node_id, node.ip_address, node.status
+                node.node_id,
+                node.ip_address,
+                node.status
             );
             Some(node.ip_address)
         }
         Err(e) => {
-            println!("Failed to parse JSON: {} for value: {}", e, &kvs[0].1);
+            logd!(5, "Failed to parse JSON: {} for value: {}", e, &kvs[0].1);
             None
         }
     }
@@ -74,29 +78,32 @@ pub async fn find_node_from_manager() -> Option<String> {
     let node_manager = match crate::node::NodeManager::new() {
         Ok(manager) => manager,
         Err(e) => {
-            eprintln!("Failed to create NodeManager: {}", e);
+            logd!(5, "Failed to create NodeManager: {}", e);
             return None;
         }
     };
 
     match node_manager.get_nodes().await {
         Ok(nodes) => {
-            println!("Node manager found {} nodes", nodes.len());
+            logd!(2, "Node manager found {} nodes", nodes.len());
 
             if !nodes.is_empty() {
                 let node = &nodes[0];
-                println!(
+                logd!(
+                    2,
                     "Node manager found: {} ({}), status: {}",
-                    node.node_id, node.ip_address, node.status
+                    node.node_id,
+                    node.ip_address,
+                    node.status
                 );
                 Some(node.ip_address.clone())
             } else {
-                println!("Node manager found no nodes");
+                logd!(4, "Node manager found no nodes");
                 None
             }
         }
         Err(e) => {
-            eprintln!("Node manager error: {}", e);
+            logd!(5, "Node manager error: {}", e);
             None
         }
     }
@@ -104,38 +111,41 @@ pub async fn find_node_from_manager() -> Option<String> {
 
 /// Find a node by hostname
 pub async fn find_node_by_hostname(hostname: &str) -> Option<common::apiserver::NodeInfo> {
-    println!("Looking for node with hostname: {}", hostname);
+    logd!(1, "Looking for node with hostname: {}", hostname);
     let kvs = match common::etcd::get_all_with_prefix("cluster/nodes/").await {
         Ok(kvs) => kvs,
         Err(e) => {
-            println!("Error searching for hostname {}: {}", hostname, e);
+            logd!(5, "Error searching for hostname {}: {}", hostname, e);
             return None;
         }
     };
 
-    println!("Found {} entries in etcd", kvs.len());
+    logd!(2, "Found {} entries in etcd", kvs.len());
     for kv in kvs {
-        println!(
+        logd!(
+            1,
             "Processing key: {}",
             String::from_utf8_lossy(kv.0.as_bytes())
         );
 
         match serde_json::from_str::<common::apiserver::NodeInfo>(&kv.1) {
             Ok(node_info) => {
-                println!("Successfully parsed node info: {}", node_info.hostname);
+                logd!(1, "Successfully parsed node info: {}", node_info.hostname);
                 if node_info.hostname == hostname {
-                    println!(
+                    logd!(
+                        1,
                         "Found node with hostname {}: {}",
-                        hostname, node_info.ip_address
+                        hostname,
+                        node_info.ip_address
                     );
                     return Some(node_info);
                 }
             }
-            Err(e) => println!("Failed to parse JSON: {} for value: {}", e, kv.1),
+            Err(e) => logd!(5, "Failed to parse JSON: {} for value: {}", e, kv.1),
         }
     }
 
-    println!("No node found with hostname: {}", hostname);
+    logd!(4, "No node found with hostname: {}", hostname);
     None
 }
 
@@ -157,7 +167,8 @@ pub async fn get_node_ip() -> String {
     // Fallback to settings file if no nodes are found
     let config = common::setting::get_config();
     let node_ip = config.host.ip.clone();
-    println!(
+    logd!(
+        4,
         "All node lookups failed. Falling back to settings IP: {}",
         node_ip
     );
@@ -170,22 +181,22 @@ pub async fn get_node_ip() -> String {
 pub async fn add_node_to_simple_keys(ip_address: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     let key = format!("nodes/{}", ip_address);
     etcd::put(&key, ip_address).await?;
-    println!("Added node IP to simple keys: {}", ip_address);
+    logd!(2, "Added node IP to simple keys: {}", ip_address);
     Ok(())
 }
 
 /// 게스트 노드 정보를 etcd에서 검색하는 함수
 pub async fn find_guest_nodes() -> Vec<NodeInfo> {
-    println!("Finding guest nodes from etcd...");
+    logd!(1, "Finding guest nodes from etcd...");
     let kvs = match etcd::get_all_with_prefix("cluster/nodes/").await {
         Ok(kvs) => kvs,
         Err(e) => {
-            println!("Error searching for guest nodes: {}", e);
+            logd!(5, "Error searching for guest nodes: {}", e);
             return Vec::new();
         }
     };
 
-    println!("Found {} node entries for guest search", kvs.len());
+    logd!(2, "Found {} node entries for guest search", kvs.len());
     let mut guest_nodes = Vec::new();
 
     for kv in kvs {
@@ -194,18 +205,21 @@ pub async fn find_guest_nodes() -> Vec<NodeInfo> {
                 // 마스터 노드가 아닌 경우에만 게스트 노드로 간주
                 if node_info.node_role != common::nodeagent::fromapiserver::NodeRole::Master as i32
                 {
-                    println!(
+                    logd!(
+                        1,
                         "Found guest node: {} ({}) with role: {}",
-                        node_info.node_id, node_info.ip_address, node_info.node_role
+                        node_info.node_id,
+                        node_info.ip_address,
+                        node_info.node_role
                     );
                     guest_nodes.push(node_info);
                 }
             }
-            Err(e) => println!("Failed to parse JSON: {} for value: {}", e, kv.1),
+            Err(e) => logd!(5, "Failed to parse JSON: {} for value: {}", e, kv.1),
         }
     }
 
-    println!("Found {} guest nodes", guest_nodes.len());
+    logd!(2, "Found {} guest nodes", guest_nodes.len());
     guest_nodes
 }
 

@@ -46,7 +46,15 @@ impl MonitoringServerManager {
     /// Initializes the MonitoringServerManager (e.g., loads scenarios, prepares state).
     pub async fn initialize(&mut self) -> Result<()> {
         println!("MonitoringServerManager init");
-        // Add initialization logic here (e.g., read scenarios, subscribe, etc.)
+
+        // Clear stale container data from previous runs
+        if let Err(e) = crate::etcd_storage::delete_all_containers().await {
+            eprintln!(
+                "[MonitoringServerManager] Warning: Failed to clear containers: {}",
+                e
+            );
+        }
+
         Ok(())
     }
 

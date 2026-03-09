@@ -23,6 +23,7 @@ use common::statemanager::{
     ErrorCode, ModelState, PackageState, ResourceType, ScenarioState, StateChange,
 };
 
+use common::logd;
 use common::Result;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -105,7 +106,7 @@ impl StateManagerManager {
     /// - Set up dependency tracking and validation systems
     /// - Configure ASIL safety monitoring and alerting
     pub async fn initialize(&mut self) -> Result<()> {
-        println!("StateManagerManager initializing...");
+        logd!(3, "StateManagerManager initializing...");
 
         // Initialize the state machine with async action executor
         let action_receiver = {
@@ -118,8 +119,11 @@ impl StateManagerManager {
             run_action_executor(action_receiver).await;
         });
 
-        println!("State machine initialized with transition tables for Scenario, Package, and Model resources");
-        println!("Async action executor started for non-blocking action processing");
+        logd!(3, "State machine initialized with transition tables for Scenario, Package, and Model resources");
+        logd!(
+            3,
+            "Async action executor started for non-blocking action processing"
+        );
 
         // TODO: Add comprehensive initialization logic:
         // - Load persisted resource states from persistent storage
@@ -130,7 +134,7 @@ impl StateManagerManager {
         // - Set up health check systems for all resource types
         // - Configure event streaming and notification systems
 
-        println!("StateManagerManager initialization completed");
+        logd!(3, "StateManagerManager initialization completed");
         Ok(())
     }
 
@@ -181,7 +185,7 @@ impl StateManagerManager {
         let resource_type = match ResourceType::try_from(state_change.resource_type) {
             Ok(rt) => rt,
             Err(_) => {
-                eprintln!(
+                logd!(5,
                     "VALIDATION ERROR: Invalid resource type '{}' in StateChange request for resource '{}'", 
                     state_change.resource_type,
                     state_change.resource_name
@@ -210,19 +214,23 @@ impl StateManagerManager {
         // - Include correlation IDs for distributed tracing
         // - Add structured fields for metrics aggregation
         // - Implement log sampling for high-volume scenarios
-        println!("=== PROCESSING STATE CHANGE ===");
-        println!(
+        logd!(1, "=== PROCESSING STATE CHANGE ===");
+        logd!(
+            1,
             "  Resource Type: {:?} (numeric: {})",
-            resource_type, state_change.resource_type
+            resource_type,
+            state_change.resource_type
         );
-        println!("  Resource Name: {}", state_change.resource_name);
-        println!(
+        logd!(1, "  Resource Name: {}", state_change.resource_name);
+        logd!(
+            1,
             "  State Transition: {} -> {}",
-            state_change.current_state, state_change.target_state
+            state_change.current_state,
+            state_change.target_state
         );
-        println!("  Transition ID: {}", state_change.transition_id);
-        println!("  Source Component: {}", state_change.source);
-        println!("  Timestamp: {} ns", state_change.timestamp_ns);
+        logd!(1, "  Transition ID: {}", state_change.transition_id);
+        logd!(1, "  Source Component: {}", state_change.source);
+        logd!(1, "  Timestamp: {} ns", state_change.timestamp_ns);
 
         // ========================================
         // COMPREHENSIVE IMPLEMENTATION ROADMAP
@@ -312,7 +320,7 @@ impl StateManagerManager {
             // ========================================
             // SUCCESS PATH: Log positive outcome and queue actions
             // ========================================
-            println!("  ✓ State transition completed successfully");
+            logd!(1, "  ✓ State transition completed successfully");
             // Convert new_state to string representation based on resource type only for logs
             let new_state_str = match resource_type {
                 ResourceType::Scenario => ScenarioState::try_from(result.new_state)
@@ -326,33 +334,38 @@ impl StateManagerManager {
                     .unwrap_or("UNKNOWN"),
                 _ => "UNKNOWN",
             };
-            println!("    Final State: {new_state_str}");
-            println!("    Success Message: {}", result.message);
-            println!("    Transition ID: {}", result.transition_id);
+            logd!(2, "    Final State: {new_state_str}");
+            logd!(2, "    Success Message: {}", result.message);
+            logd!(1, "    Transition ID: {}", result.transition_id);
 
             // 🔍 COMMENT 6: Save scenario state changes to ETCD
             // StateManager receives state change requests from FilterGateway, ActionController, and PolicyManager
             // and saves the scenario state transitions to ETCD for persistence
             if resource_type == ResourceType::Scenario {
-                println!("💾 SCENARIO STATE PERSISTENCE: StateManager ETCD Storage");
-                println!("   📋 Scenario: {}", state_change.resource_name);
-                println!("   🔄 Final State: {}", new_state_str);
-                println!("   🔍 Reason: Successful state transition completed");
+                logd!(
+                    1,
+                    "💾 SCENARIO STATE PERSISTENCE: StateManager ETCD Storage"
+                );
+                logd!(1, "   📋 Scenario: {}", state_change.resource_name);
+                logd!(1, "   🔄 Final State: {}", new_state_str);
+                logd!(1, "   🔍 Reason: Successful state transition completed");
 
                 let etcd_key = format!("/scenario/{}/state", state_change.resource_name);
                 let etcd_value = new_state_str;
 
-                println!("   📤 Saving to ETCD:");
-                println!("      • Key: {}", etcd_key);
-                println!("      • Value: {}", etcd_value);
-                println!("      • Operation: common::etcd::put()");
+                logd!(1, "   📤 Saving to ETCD:");
+                logd!(1, "      • Key: {}", etcd_key);
+                logd!(1, "      • Value: {}", etcd_value);
+                logd!(1, "      • Operation: common::etcd::put()");
 
                 if let Err(e) = common::etcd::put(&etcd_key, etcd_value).await {
-                    println!("   ❌ Failed to save scenario state to ETCD: {:?}", e);
+                    logd!(4, "   ❌ Failed to save scenario state to ETCD: {:?}", e);
                 } else {
-                    println!(
+                    logd!(
+                        1,
                         "   ✅ Successfully saved scenario state to ETCD: {} → {}",
-                        etcd_key, etcd_value
+                        etcd_key,
+                        etcd_value
                     );
                 }
             }
@@ -360,21 +373,25 @@ impl StateManagerManager {
             // Log any actions that were queued for asynchronous execution
             // Actions are processed separately to keep state transitions fast
             if !result.actions_to_execute.is_empty() {
-                println!("    Actions queued for async execution:");
+                logd!(1, "    Actions queued for async execution:");
                 for action in &result.actions_to_execute {
-                    println!("      - {action}");
+                    logd!(1, "      - {action}");
                 }
-                println!(
+                logd!(
+                    1,
                     "    Note: Actions will be executed asynchronously by the action executor"
                 );
             }
 
-            println!("  Status: State change processing completed successfully");
+            logd!(
+                1,
+                "  Status: State change processing completed successfully"
+            );
         } else {
             // ========================================
             // FAILURE PATH: Log error details and initiate recovery
             // ========================================
-            println!("  ✗ State transition failed");
+            logd!(4, "  ✗ State transition failed");
             // Convert new_state to string representation based on resource type only for logs
             let new_state_str = match resource_type {
                 ResourceType::Scenario => ScenarioState::try_from(result.new_state)
@@ -388,20 +405,20 @@ impl StateManagerManager {
                     .unwrap_or("UNKNOWN"),
                 _ => "UNKNOWN",
             };
-            println!("    Error Code: {:?}", result.error_code);
-            println!("    Error Message: {}", result.message);
-            println!("    Error Details: {}", result.error_details);
-            println!("    Current State: {new_state_str} (unchanged)");
-            println!("    Failed Transition ID: {}", result.transition_id);
+            logd!(4, "    Error Code: {:?}", result.error_code);
+            logd!(4, "    Error Message: {}", result.message);
+            logd!(4, "    Error Details: {}", result.error_details);
+            logd!(4, "    Current State: {new_state_str} (unchanged)");
+            logd!(4, "    Failed Transition ID: {}", result.transition_id);
 
             // Delegate to specialized failure handling logic
             // This method will analyze the failure type and determine appropriate recovery actions
             self.handle_transition_failure(&state_change, &result).await;
 
-            println!("  Status: State change processing completed with errors");
+            logd!(4, "  Status: State change processing completed with errors");
         }
 
-        println!("================================");
+        logd!(1, "================================");
     }
 
     /// Handle state transition failures
@@ -410,30 +427,34 @@ impl StateManagerManager {
         state_change: &StateChange,
         result: &TransitionResult,
     ) {
-        println!(
+        logd!(
+            4,
             "    Handling transition failure for resource: {}",
             state_change.resource_name
         );
-        println!("      Error: {}", result.message);
-        println!("      Error code: {:?}", result.error_code);
-        println!("      Error details: {}", result.error_details);
+        logd!(4, "      Error: {}", result.message);
+        logd!(4, "      Error code: {:?}", result.error_code);
+        logd!(4, "      Error details: {}", result.error_details);
 
         // Generate appropriate error responses based on error type
         match result.error_code {
             ErrorCode::InvalidStateTransition => {
-                println!("      Invalid state transition - checking state machine rules");
+                logd!(
+                    4,
+                    "      Invalid state transition - checking state machine rules"
+                );
                 // Would log detailed state machine validation errors
             }
             ErrorCode::PreconditionFailed => {
-                println!("      Preconditions not met - evaluating retry strategy");
+                logd!(4, "      Preconditions not met - evaluating retry strategy");
                 // Would check if conditions might be met later and schedule retry
             }
             ErrorCode::ResourceNotFound => {
-                println!("      Resource not found - may need initialization");
+                logd!(4, "      Resource not found - may need initialization");
                 // Would check if resource needs to be created or registered
             }
             _ => {
-                println!("      General error - applying default error handling");
+                logd!(4, "      General error - applying default error handling");
                 // Would apply general error handling procedures
             }
         }
@@ -459,9 +480,9 @@ impl StateManagerManager {
     /// 3. Evaluate model state based on container states
     /// 4. Update model states in ETCD if transitions occur
     async fn process_container_list(&self, container_list: ContainerList) {
-        println!("=== PROCESSING CONTAINER LIST ===");
-        println!("  Node Name: {}", container_list.node_name);
-        println!("  Container Count: {}", container_list.containers.len());
+        logd!(2, "=== PROCESSING CONTAINER LIST ===");
+        logd!(2, "  Node Name: {}", container_list.node_name);
+        logd!(2, "  Container Count: {}", container_list.containers.len());
 
         // Process containers and group by model
         let model_containers = self
@@ -470,7 +491,7 @@ impl StateManagerManager {
 
         // Process each model's container states
         for (model_name, containers) in model_containers {
-            println!("  Processing model: {}", model_name);
+            logd!(2, "  Processing model: {}", model_name);
 
             // Process the state evaluation and transition through the state machine
             let mut state_machine = self.state_machine.lock().await;
@@ -482,7 +503,8 @@ impl StateManagerManager {
                 let state_changed = !transition_result.actions_to_execute.is_empty();
 
                 if state_changed {
-                    println!(
+                    logd!(
+                        1,
                         "    State transition successful: {}",
                         transition_result.message
                     );
@@ -503,24 +525,32 @@ impl StateManagerManager {
                         .save_model_state_to_etcd(&model_name, new_model_state)
                         .await
                     {
-                        println!("    Failed to save model state to ETCD: {:?}", e);
+                        logd!(4, "    Failed to save model state to ETCD: {:?}", e);
                     } else {
-                        println!("    Successfully saved model state to ETCD");
+                        logd!(1, "    Successfully saved model state to ETCD");
 
                         // Trigger package state evaluation based on model state change
                         // This implements the chain reaction described in the Korean documentation
                         self.trigger_package_state_evaluation(&model_name).await;
                     }
                 } else {
-                    println!("    Model state unchanged: {}", transition_result.message);
+                    logd!(
+                        2,
+                        "    Model state unchanged: {}",
+                        transition_result.message
+                    );
                 }
             } else {
-                println!("    State evaluation failed: {}", transition_result.message);
+                logd!(
+                    4,
+                    "    State evaluation failed: {}",
+                    transition_result.message
+                );
             }
         }
 
-        println!("  Status: Container list processing completed");
-        println!("=====================================");
+        logd!(2, "  Status: Container list processing completed");
+        logd!(2, "=====================================");
     }
 
     /// Groups containers by their associated model based on annotations or naming conventions
@@ -590,10 +620,10 @@ impl StateManagerManager {
             _ => "Unknown",
         };
 
-        println!("    Saving to ETCD - Key: {}, Value: {}", key, value);
+        logd!(1, "    Saving to ETCD - Key: {}, Value: {}", key, value);
 
         if let Err(e) = common::etcd::put(&key, value).await {
-            println!("    Failed to save model state: {:?}", e);
+            logd!(5, "    Failed to save model state: {:?}", e);
             return Err(format!(
                 "Failed to save model state for {}: {:?}",
                 model_name, e
@@ -614,13 +644,15 @@ impl StateManagerManager {
         let key = format!("/package/{}/state", package_name);
         let value = package_state.as_str_name();
 
-        println!(
+        logd!(
+            1,
             "    Saving package state to ETCD - Key: {}, Value: {}",
-            key, value
+            key,
+            value
         );
 
         if let Err(e) = common::etcd::put(&key, value).await {
-            println!("    Failed to save package state: {:?}", e);
+            logd!(5, "    Failed to save package state: {:?}", e);
             return Err(format!(
                 "Failed to save package state for {}: {:?}",
                 package_name, e
@@ -636,7 +668,8 @@ impl StateManagerManager {
     /// When a model state changes, it triggers package state evaluation to see if the
     /// package state should also change based on the states of all models in the package.
     async fn trigger_package_state_evaluation(&self, changed_model_name: &str) {
-        println!(
+        logd!(
+            2,
             "  Triggering package state evaluation for model: {}",
             changed_model_name
         );
@@ -646,9 +679,11 @@ impl StateManagerManager {
         {
             Ok(pkgs) => pkgs,
             Err(e) => {
-                println!(
+                logd!(
+                    4,
                     "    Failed to find packages for model {}: {:?}",
-                    changed_model_name, e
+                    changed_model_name,
+                    e
                 );
                 return;
             }
@@ -670,7 +705,7 @@ impl StateManagerManager {
                             .save_package_state_to_etcd(&package_name, new_state)
                             .await
                         {
-                            println!("      Failed to save package state: {:?}", e);
+                            logd!(5, "      Failed to save package state: {:?}", e);
                             continue;
                         }
 
@@ -682,14 +717,16 @@ impl StateManagerManager {
                                 .trigger_action_controller_reconcile_internal(&package_name)
                                 .await
                             {
-                                println!(
+                                logd!(
+                                    5,
                                     "      Failed to trigger ActionController reconcile: {:?}",
                                     e
                                 );
                             }
                         }
 
-                        println!(
+                        logd!(
+                            1,
                             "      Successfully updated package {} state to {}",
                             package_name,
                             new_state.as_str_name()
@@ -697,9 +734,11 @@ impl StateManagerManager {
                     }
                 }
                 Err(e) => {
-                    println!(
+                    logd!(
+                        4,
                         "    Failed to evaluate package state for {}: {:?}",
-                        package_name, e
+                        package_name,
+                        e
                     );
                 }
             }
@@ -724,7 +763,8 @@ impl StateManagerManager {
         &self,
         package_name: &str,
     ) -> std::result::Result<(), String> {
-        println!(
+        logd!(
+            3,
             "      Triggering ActionController reconcile for package: {}",
             package_name
         );
@@ -733,13 +773,15 @@ impl StateManagerManager {
         let scenario_name = match self.find_scenario_for_package(package_name).await {
             Ok(Some(name)) => name,
             Ok(None) => {
-                println!("      No scenario found for package: {}", package_name);
+                logd!(4, "      No scenario found for package: {}", package_name);
                 return Err(format!("No scenario found for package: {}", package_name));
             }
             Err(e) => {
-                println!(
+                logd!(
+                    4,
                     "      Failed to find scenario for package {}: {:?}",
-                    package_name, e
+                    package_name,
+                    e
                 );
                 return Err(format!("Failed to find scenario for package: {}", e));
             }
@@ -754,11 +796,13 @@ impl StateManagerManager {
 
         match sender::_send(reconcile_request).await {
             Ok(response) => {
-                println!(
+                logd!(
+                    2,
                     "      Successfully sent reconcile request for scenario: {}",
                     scenario_name
                 );
-                println!(
+                logd!(
+                    1,
                     "      ActionController response: status={:?}",
                     response.get_ref().status
                 );
@@ -769,7 +813,7 @@ impl StateManagerManager {
                     "Failed to send reconcile request to ActionController: {:?}",
                     e
                 );
-                println!("      {}", error_msg);
+                logd!(5, "      {}", error_msg);
                 Err(error_msg)
             }
         }
@@ -792,14 +836,14 @@ impl StateManagerManager {
                             }
                         }
                         Err(e) => {
-                            println!("      Failed to parse scenario {}: {:?}", kv.0, e);
+                            logd!(4, "      Failed to parse scenario {}: {:?}", kv.0, e);
                         }
                     }
                 }
                 Ok(None) // No scenario found containing this package
             }
             Err(e) => {
-                println!("      Failed to get scenarios from ETCD: {:?}", e);
+                logd!(4, "      Failed to get scenarios from ETCD: {:?}", e);
                 Err(format!("Failed to get scenarios from ETCD: {:?}", e))
             }
         }
@@ -844,14 +888,15 @@ impl StateManagerManager {
                         }
                         None => {
                             // Channel closed - graceful shutdown
-                            println!(
+                            logd!(
+                                4,
                                 "Container channel closed - shutting down container processing"
                             );
                             break;
                         }
                     }
                 }
-                println!("ContainerList processing task stopped");
+                logd!(4, "ContainerList processing task stopped");
             })
         };
 
@@ -874,12 +919,15 @@ impl StateManagerManager {
                         }
                         None => {
                             // Channel closed - graceful shutdown
-                            println!("StateChange channel closed - shutting down state processing");
+                            logd!(
+                                4,
+                                "StateChange channel closed - shutting down state processing"
+                            );
                             break;
                         }
                     }
                 }
-                println!("StateChange processing task stopped");
+                logd!(4, "StateChange processing task stopped");
             })
         };
 
@@ -887,11 +935,11 @@ impl StateManagerManager {
         let result = tokio::try_join!(container_task, state_change_task);
         match result {
             Ok(_) => {
-                println!("All processing tasks completed successfully");
+                logd!(3, "All processing tasks completed successfully");
                 Ok(())
             }
             Err(e) => {
-                eprintln!("Error in processing tasks: {e:?}");
+                logd!(4, "Error in processing tasks: {e:?}");
                 Err(e.into())
             }
         }
@@ -938,7 +986,7 @@ impl StateManagerManager {
         // Spawn the main gRPC processing task
         let grpc_processor = tokio::spawn(async move {
             if let Err(e) = grpc_manager.process_grpc_requests().await {
-                eprintln!("Error in gRPC processor: {e:?}");
+                logd!(5, "Error in gRPC processor: {e:?}");
             }
         });
 
@@ -946,11 +994,11 @@ impl StateManagerManager {
         let result = grpc_processor.await;
         match result {
             Ok(_) => {
-                println!("StateManagerManager stopped gracefully");
+                logd!(4, "StateManagerManager stopped gracefully");
                 Ok(())
             }
             Err(e) => {
-                eprintln!("StateManagerManager stopped with error: {e:?}");
+                logd!(5, "StateManagerManager stopped with error: {e:?}");
                 Err(e.into())
             }
         }
@@ -962,7 +1010,10 @@ impl StateManagerManager {
 /// This function handles the execution of actions triggered by state transitions.
 /// Actions are executed asynchronously to ensure state transitions remain fast and non-blocking.
 pub async fn run_action_executor(mut receiver: mpsc::UnboundedReceiver<ActionCommand>) {
-    println!("Action executor started - processing actions asynchronously");
+    logd!(
+        3,
+        "Action executor started - processing actions asynchronously"
+    );
 
     while let Some(action_command) = receiver.recv().await {
         // Execute action asynchronously without blocking state transitions
@@ -971,170 +1022,199 @@ pub async fn run_action_executor(mut receiver: mpsc::UnboundedReceiver<ActionCom
         });
     }
 
-    println!("Action executor stopped");
+    logd!(4, "Action executor stopped");
 }
 
 /// Execute individual action asynchronously
 async fn execute_action(command: ActionCommand) {
-    println!(
+    logd!(
+        3,
         " Executing action: {} for resource: {}",
-        command.action, command.resource_key
+        command.action,
+        command.resource_key
     );
 
     match command.action.as_str() {
         "start_condition_evaluation" => {
-            println!(
+            logd!(
+                2,
                 " Starting condition evaluation for scenario: {}",
                 command.resource_key
             );
             // Would integrate with policy engine or condition evaluator
         }
         "start_policy_verification" => {
-            println!(
+            logd!(
+                2,
                 " Starting policy verification for scenario: {}",
                 command.resource_key
             );
             // Would integrate with policy manager
         }
         "execute_action_on_target_package" => {
-            println!(
+            logd!(
+                2,
                 " Executing action on target package for scenario: {}",
                 command.resource_key
             );
             // Would trigger package operations
         }
         "log_denial_generate_alert" => {
-            println!(
+            logd!(
+                2,
                 " Logging denial and generating alert for scenario: {}",
                 command.resource_key
             );
             // Would integrate with alerting system
         }
         "start_model_creation_allocate_resources" => {
-            println!(
+            logd!(
+                2,
                 " Starting model creation and resource allocation for package: {}",
                 command.resource_key
             );
             // Would integrate with resource allocation system
         }
         "update_state_announce_availability" => {
-            println!(
+            logd!(
+                2,
                 " Updating state and announcing availability for: {}",
                 command.resource_key
             );
             // Would update service discovery and announce availability
         }
         "log_warning_activate_partial_functionality" => {
-            println!(
+            logd!(
+                2,
                 " Logging warning and activating partial functionality for: {}",
                 command.resource_key
             );
             // Would configure degraded mode operation
         }
         "log_error_attempt_recovery" => {
-            println!(
+            logd!(
+                2,
                 " Logging error and attempting recovery for: {}",
                 command.resource_key
             );
             // Would trigger automated recovery procedures
         }
         "pause_models_preserve_state" => {
-            println!(
+            logd!(
+                2,
                 " Pausing models and preserving state for: {}",
                 command.resource_key
             );
             // Would pause container execution and save state
         }
         "resume_models_restore_state" => {
-            println!(
+            logd!(
+                2,
                 " Resuming models and restoring state for: {}",
                 command.resource_key
             );
             // Would resume container execution and restore state
         }
         "start_node_selection_and_allocation" => {
-            println!(
+            logd!(
+                2,
                 " Starting node selection and allocation for model: {}",
                 command.resource_key
             );
             // Would integrate with scheduler for node allocation
         }
         "pull_container_images_mount_volumes" => {
-            println!(
+            logd!(
+                2,
                 " Pulling container images and mounting volumes for model: {}",
                 command.resource_key
             );
             // Would trigger container image pulls and volume mounts
         }
         "update_state_start_readiness_checks" => {
-            println!(
+            logd!(
+                2,
                 " Updating state and starting readiness checks for model: {}",
                 command.resource_key
             );
             // Would start health/readiness checks
         }
         "log_completion_clean_up_resources" => {
-            println!(
+            logd!(
+                2,
                 " Logging completion and cleaning up resources for model: {}",
                 command.resource_key
             );
             // Would clean up completed job resources
         }
         "set_backoff_timer_collect_logs" => {
-            println!(
+            logd!(
+                2,
                 " Setting backoff timer and collecting logs for model: {}",
                 command.resource_key
             );
             // Would set exponential backoff and collect diagnostic logs
         }
         "attempt_diagnostics_restore_communication" => {
-            println!(
+            logd!(
+                2,
                 " Attempting diagnostics and restoring communication for model: {}",
                 command.resource_key
             );
             // Would run diagnostic checks and restore node communication
         }
         "resume_monitoring_reset_counter" => {
-            println!(
+            logd!(
+                2,
                 " Resuming monitoring and resetting counter for model: {}",
                 command.resource_key
             );
             // Would resume monitoring and reset failure counters
         }
         "log_error_notify_for_manual_intervention" => {
-            println!(
+            logd!(
+                2,
                 " Logging error and notifying for manual intervention for model: {}",
                 command.resource_key
             );
             // Would log critical error and notify operations team
         }
         "synchronize_state_recover_if_needed" => {
-            println!(
+            logd!(
+                2,
                 " Synchronizing state and recovering if needed for model: {}",
                 command.resource_key
             );
             // Would synchronize state and trigger recovery if necessary
         }
         "start_model_recreation" => {
-            println!(" Starting model recreation for: {}", command.resource_key);
+            logd!(
+                2,
+                " Starting model recreation for: {}",
+                command.resource_key
+            );
             // Would start complete model recreation process
         }
         _ => {
-            println!(
+            logd!(
+                4,
                 " Unknown action: {} for resource: {}",
-                command.action, command.resource_key
+                command.action,
+                command.resource_key
             );
         }
     }
 
     // Print context information if available
     if !command.context.is_empty() {
-        println!("    Context: {:?}", command.context);
+        logd!(2, "    Context: {:?}", command.context);
     }
 
-    println!(
+    logd!(
+        2,
         "  ✓ Action '{}' completed for: {}",
-        command.action, command.resource_key
+        command.action,
+        command.resource_key
     );
 }
 

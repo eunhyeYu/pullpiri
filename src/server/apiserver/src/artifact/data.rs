@@ -5,6 +5,8 @@
 
 //! Read/Write/Delete artifact data in etcd
 
+use common::logd;
+
 /// Read yaml string of artifacts from etcd
 ///
 /// ### Parameters
@@ -43,7 +45,7 @@ pub async fn write_to_etcd(key: &str, artifact_str: &str) -> common::Result<()> 
     let result = common::etcd::put(key, artifact_str).await;
     let elapsed = start.elapsed();
 
-    println!("write_to_etcd: elapsed = {:?}", elapsed);
+    logd!(1, "write_to_etcd: elapsed = {:?}", elapsed);
 
     result?;
     Ok(())
@@ -121,7 +123,7 @@ spec:
     #[tokio::test]
     async fn test_read_from_etcd_positive() {
         let result = read_from_etcd(TEST_KEY).await;
-        println!("read_from_etcd (positive) result = {:?}", result);
+        logd!(1, "read_from_etcd (positive) result = {:?}", result);
 
         //we accept both Ok and Err depending on etcd state
         assert!(
@@ -135,7 +137,8 @@ spec:
     #[tokio::test]
     async fn test_read_all_scenario_from_etcd_positive() {
         let result = read_all_scenario_from_etcd().await;
-        println!(
+        logd!(
+            2,
             "read_all_scenario_from_etcd (positive) result = {:?}",
             result
         );
@@ -155,9 +158,11 @@ spec:
         let start = Instant::now();
         let result = write_to_etcd(TEST_KEY, TEST_YAML).await;
         let duration = start.elapsed();
-        println!(
+        logd!(
+            2,
             "write_to_etcd (positive) result = {:?}, elapsed = {:?}",
-            result, duration
+            result,
+            duration
         );
         assert!(
             result.is_ok() || result.is_err(),
@@ -170,7 +175,7 @@ spec:
     #[tokio::test]
     async fn test_delete_at_etcd_positive() {
         let result = delete_at_etcd(TEST_KEY).await;
-        println!("delete_at_etcd (positive) result = {:?}", result);
+        logd!(2, "delete_at_etcd (positive) result = {:?}", result);
         // We accept Ok (key deleted) or Err (key not found) as valid outcomes
         assert!(
             result.is_ok() || result.is_err(),

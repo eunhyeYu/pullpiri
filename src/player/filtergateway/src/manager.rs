@@ -7,6 +7,7 @@ use crate::grpc::sender::actioncontroller::FilterGatewaySender;
 use crate::grpc::sender::statemanager::StateManagerSender;
 use crate::vehicle::dds::DdsData;
 use crate::vehicle::VehicleManager;
+use common::logd;
 use common::spec::artifact::Scenario;
 use common::statemanager::{ResourceType, StateChange};
 use common::{spec::artifact::Artifact, Result};
@@ -59,7 +60,7 @@ impl FilterGatewayManager {
 
         // Improved error handling: explicit error handling instead of unwrap()
         if let Err(e) = vehicle_manager.init().await {
-            println!("Warning: Failed to initialize vehicle manager: {:?}. Continuing with default settings.", e);
+            logd!(4, "Warning: Failed to initialize vehicle manager: {:?}. Continuing with default settings.", e);
             // Continue (already using default values in VehicleManager::init())
         }
 
@@ -81,7 +82,7 @@ impl FilterGatewayManager {
     ///
     /// * `Result<()>` - Success or error result
     pub async fn initialize(&self) -> Result<()> {
-        println!("FilterGatewayManager init");
+        logd!(3, "FilterGatewayManager init");
         // Initialize vehicle manager
         let etcd_scenario = Self::read_all_scenario_from_etcd()
             .await
@@ -89,7 +90,7 @@ impl FilterGatewayManager {
 
         for scenario in etcd_scenario {
             let scenario: Scenario = serde_yaml::from_str(&scenario)?;
-            println!("Scenario: {:?}", scenario);
+            logd!(3, "Scenario: {:?}", scenario);
             let topic_name = scenario
                 .get_conditions()
                 .as_ref()
@@ -105,7 +106,7 @@ impl FilterGatewayManager {
                 .subscribe_topic(topic_name, data_type_name)
                 .await
             {
-                eprintln!("Error subscribing to vehicle data: {:?}", e);
+                logd!(5, "Error subscribing to vehicle data: {:?}", e);
             }
             self.launch_scenario_filter(scenario).await?;
         }
@@ -133,9 +134,11 @@ impl FilterGatewayManager {
                 Some(dds_data) => {
                     // Only print if topic or value is not empty
                     if !dds_data.name.is_empty() && !dds_data.value.is_empty() {
-                        println!(
+                        logd!(
+                            3,
                             "Received DDS data: topic={}, value={}",
-                            dds_data.name, dds_data.value
+                            dds_data.name,
+                            dds_data.value
                         );
                     }
 
@@ -145,9 +148,11 @@ impl FilterGatewayManager {
                         if filter.is_active() {
                             // Pass DDS data to filter
                             if let Err(e) = filter.process_data(&dds_data).await {
-                                println!(
+                                logd!(
+                                    5,
                                     "Error processing DDS data in filter {}: {:?}",
-                                    filter.scenario_name, e
+                                    filter.scenario_name,
+                                    e
                                 );
                             }
                         }
@@ -155,7 +160,7 @@ impl FilterGatewayManager {
                 }
                 None => {
                     // Channel closed
-                    println!("DDS data channel closed, stopping processor");
+                    logd!(5, "DDS data channel closed, stopping processor");
                     break;
                 }
             }
@@ -181,7 +186,7 @@ impl FilterGatewayManager {
 
             match scenario_parameter {
                 Some(param) => {
-                    println!("Received scenario parameter: {:?}", param);
+                    logd!(2, "Received scenario parameter: {:?}", param);
                     match param.action {
                         0 => {
                             // Allow
@@ -203,7 +208,7 @@ impl FilterGatewayManager {
                                 .subscribe_topic(topic_name, data_type_name)
                                 .await
                             {
-                                eprintln!("Error subscribing to vehicle data: {:?}", e);
+                                logd!(5, "Error subscribing to vehicle data: {:?}", e);
                             }
                             self.launch_scenario_filter(param.scenario).await?;
                         }
@@ -215,7 +220,7 @@ impl FilterGatewayManager {
                                 .unsubscribe_topic(param.scenario.get_name().clone())
                                 .await
                             {
-                                eprintln!("Error unsubscribing from vehicle data: {:?}", e);
+                                logd!(5, "Error unsubscribing from vehicle data: {:?}", e);
                             }
                             self.remove_scenario_filter(param.scenario.get_name().clone())
                                 .await?;
@@ -225,7 +230,7 @@ impl FilterGatewayManager {
                 }
                 None => {
                     // Channel closed
-                    println!("gRPC channel closed, stopping processor");
+                    logd!(5, "gRPC channel closed, stopping processor");
                     break;
                 }
             }
@@ -248,7 +253,7 @@ impl FilterGatewayManager {
         let gateway_dds_manager = Arc::clone(&arc_self);
         let dds_processor = tokio::spawn(async move {
             if let Err(e) = gateway_dds_manager.process_dds_data().await {
-                eprintln!("Error in DDS processor: {:?}", e);
+                logd!(5, "Error in DDS processor: {:?}", e);
             }
         });
 
@@ -256,14 +261,14 @@ impl FilterGatewayManager {
         let gateway_grpc_manager = Arc::clone(&arc_self);
         let grpc_processor = tokio::spawn(async move {
             if let Err(e) = gateway_grpc_manager.process_grpc_requests().await {
-                eprintln!("Error in gRPC processor: {:?}", e);
+                logd!(5, "Error in gRPC processor: {:?}", e);
             }
         });
 
         // 태스크 완료 대기
         let _ = tokio::try_join!(dds_processor, grpc_processor);
 
-        println!("FilterGatewayManager stopped");
+        logd!(5, "FilterGatewayManager stopped");
 
         Ok(())
     }
@@ -282,15 +287,19 @@ impl FilterGatewayManager {
         use std::time::Instant;
         let start = Instant::now();
 
-        println!("subscribe vehicle data {}", vehicle_message.name);
-        println!("subscribe vehicle data {}", vehicle_message.value);
+        logd!(
+            1,
+            "subscribe vehicle data {} - {}",
+            vehicle_message.name,
+            vehicle_message.value
+        );
         let mut vehicle_manager = self.vehicle_manager.lock().await;
         vehicle_manager
             .subscribe_topic(vehicle_message.name, vehicle_message.value)
             .await?;
 
         let elapsed = start.elapsed();
-        println!("subscribe_vehicle_data: elapsed = {:?}", elapsed);
+        logd!(1, "subscribe_vehicle_data: elapsed = {:?}", elapsed);
 
         Ok(())
     }
@@ -308,7 +317,7 @@ impl FilterGatewayManager {
     ///
     /// * `Result<()>` - Success or error result
     pub async fn unsubscribe_vehicle_data(&self, vehicle_message: DdsData) -> Result<()> {
-        println!("unsubscribe vehicle data {}", vehicle_message.name);
+        logd!(3, "unsubscribe vehicle data {}", vehicle_message.name);
         let mut vehicle_manager = self.vehicle_manager.lock().await;
         vehicle_manager
             .unsubscribe_topic(vehicle_message.name)
@@ -335,19 +344,25 @@ impl FilterGatewayManager {
 
         // Check if the scenario has conditions
         if scenario.get_conditions().is_none() {
-            println!("No conditions for scenario: {}", scenario.get_name());
+            logd!(3, "No conditions for scenario: {}", scenario.get_name());
             let mut sender = self.sender.lock().await;
             sender.trigger_action(scenario.get_name().clone()).await?;
             let elapsed = start.elapsed();
-            println!("launch_scenario_filter: elapsed = {:?}", elapsed);
+            logd!(1, "launch_scenario_filter: elapsed = {:?}", elapsed);
             return Ok(());
         }
 
         // Set scenario state from idle to waiting when conditions are registered
-        println!("🔄 SCENARIO STATE TRANSITION: FilterGateway Condition Registration");
-        println!("   📋 Scenario: {}", scenario.get_name());
-        println!("   🔄 State Change: idle → waiting");
-        println!("   🔍 Reason: Scenario conditions registered in FilterGateway");
+        logd!(
+            1,
+            "🔄 SCENARIO STATE TRANSITION: FilterGateway Condition Registration"
+        );
+        logd!(1, "   📋 Scenario: {}", scenario.get_name());
+        logd!(1, "   🔄 State Change: idle → waiting");
+        logd!(
+            1,
+            "   🔍 Reason: Scenario conditions registered in FilterGateway"
+        );
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -364,19 +379,24 @@ impl FilterGatewayManager {
             source: "filtergateway".to_string(),
         };
 
-        println!("   📤 Sending StateChange to StateManager:");
-        println!("      • Resource Type: SCENARIO");
-        println!("      • Resource Name: {}", state_change.resource_name);
-        println!("      • Current State: {}", state_change.current_state);
-        println!("      • Target State: {}", state_change.target_state);
-        println!("      • Transition ID: {}", state_change.transition_id);
-        println!("      • Source: {}", state_change.source);
+        logd!(1, "   📤 Sending StateChange to StateManager:");
+        logd!(1, "      • Resource Type: SCENARIO");
+        logd!(1, "      • Resource Name: {}", state_change.resource_name);
+        logd!(1, "      • Current State: {}", state_change.current_state);
+        logd!(1, "      • Target State: {}", state_change.target_state);
+        logd!(1, "      • Transition ID: {}", state_change.transition_id);
+        logd!(1, "      • Source: {}", state_change.source);
 
         let mut state_sender = StateManagerSender::new();
         if let Err(e) = state_sender.send_state_change(state_change).await {
-            println!("   ❌ Failed to send state change to StateManager: {:?}", e);
+            logd!(
+                5,
+                "   ❌ Failed to send state change to StateManager: {:?}",
+                e
+            );
         } else {
-            println!(
+            logd!(
+                2,
                 "   ✅ Successfully notified StateManager: scenario {} idle → waiting",
                 scenario.get_name()
             );
@@ -396,18 +416,19 @@ impl FilterGatewayManager {
                 .iter()
                 .any(|f| f.scenario_name == filter.scenario_name)
             {
-                println!(
+                logd!(
+                    3,
                     "Filter for scenario '{}' already exists, skipping.",
                     filter.scenario_name
                 );
                 let elapsed = start.elapsed();
-                println!("launch_scenario_filter: elapsed = {:?}", elapsed);
+                logd!(1, "launch_scenario_filter: elapsed = {:?}", elapsed);
                 return Ok(());
             }
             filters.push(filter);
         }
         let elapsed = start.elapsed();
-        println!("launch_scenario_filter: elapsed = {:?}", elapsed);
+        logd!(1, "launch_scenario_filter: elapsed = {:?}", elapsed);
         Ok(())
     }
 
@@ -423,7 +444,7 @@ impl FilterGatewayManager {
     ///
     /// * `Result<()>` - Success or error result
     pub async fn remove_scenario_filter(&self, scenario_name: String) -> Result<()> {
-        println!("remove filter {}\n", scenario_name);
+        logd!(3, "remove filter {}\n", scenario_name);
 
         let arc_filters = Arc::clone(&self.filters);
         let mut filters = arc_filters.lock().await;

@@ -14,6 +14,7 @@ use common::actioncontroller::{
     CompleteNetworkSettingRequest, CompleteNetworkSettingResponse, PodStatus as ActionStatus,
     ReconcileRequest, ReconcileResponse, TriggerActionRequest, TriggerActionResponse,
 };
+use common::logd;
 
 /// Receiver for handling incoming gRPC requests for ActionController
 ///
@@ -75,18 +76,30 @@ impl ActionControllerConnection for ActionControllerReceiver {
         use std::time::Instant;
         let start = Instant::now();
 
-        println!("trigger_action in grpc receiver");
+        logd!(1, "trigger_action in grpc receiver");
 
         let scenario_name = request.into_inner().scenario_name;
-        println!("trigger_action scenario: {}", scenario_name);
+        logd!(2, "trigger_action scenario: {}", scenario_name);
 
-        println!("🔄 SCENARIO STATE TRANSITION: ActionController Processing");
-        println!("   📋 Scenario: {}", scenario_name);
-        println!("   🔍 Reason: ActionController received trigger_action from FilterGateway");
-        println!("   📝 Note: ActionController does not change state from waiting→satisfied");
-        println!("          FilterGateway handles this transition when conditions are met");
+        logd!(
+            1,
+            "🔄 SCENARIO STATE TRANSITION: ActionController Processing"
+        );
+        logd!(1, "   📋 Scenario: {}", scenario_name);
+        logd!(
+            1,
+            "   🔍 Reason: ActionController received trigger_action from FilterGateway"
+        );
+        logd!(
+            1,
+            "   📝 Note: ActionController does not change state from waiting→satisfied"
+        );
+        logd!(
+            1,
+            "          FilterGateway handles this transition when conditions are met"
+        );
 
-        println!("   🎯 Processing scenario actions...");
+        logd!(1, "   🎯 Processing scenario actions...");
         let result = match self.manager.trigger_manager_action(&scenario_name).await {
             Ok(_) => Ok(Response::new(TriggerActionResponse {
                 status: 0,
@@ -112,7 +125,7 @@ impl ActionControllerConnection for ActionControllerReceiver {
         };
 
         let elapsed = start.elapsed();
-        println!("trigger_action: elapsed = {:?}", elapsed);
+        logd!(1, "trigger_action: elapsed = {:?}", elapsed);
 
         result
     }
@@ -157,7 +170,7 @@ impl ActionControllerConnection for ActionControllerReceiver {
             // If reconcile_do returns an error, convert it into a gRPC Status::internal error
             // and propagate it. This allows gRPC clients to receive a proper error status.
             Err(e) => {
-                eprintln!("Reconciliation failed: {:?}", e); // Log the error for debugging
+                logd!(5, "Reconciliation failed: {:?}", e); // Log the error for debugging
                 Err(Status::internal(format!("Failed to reconcile: {}", e)))
             }
         }
@@ -168,7 +181,7 @@ impl ActionControllerConnection for ActionControllerReceiver {
         request: Request<CompleteNetworkSettingRequest>,
     ) -> Result<Response<CompleteNetworkSettingResponse>, Status> {
         let req = request.into_inner();
-        println!(
+        logd!(2,
             "CompleteNetworkSettingRequest: request_id={}, network_status={:?}, pod_status={:?}, details={}",
             req.request_id, req.network_status, req.pod_status, req.details
         );
@@ -363,9 +376,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_scenario_state_management_workflow() {
-        println!("🧪 Testing ActionController Scenario State Management");
-        println!("===================================================");
-
         // Setup test scenario in ETCD
         let scenario_yaml = r#"
         apiVersion: v1
@@ -402,12 +412,6 @@ mod tests {
         common::etcd::put("package/test-state-scenario", package_yaml)
             .await
             .unwrap();
-
-        println!("📋 Test Scenario: test-state-scenario");
-        println!("🔄 Expected State Changes:");
-        println!("   1. waiting → satisfied (on trigger_action)");
-        println!("   2. allowed → completed (on processing completion)");
-        println!("");
 
         // Test trigger_action (waiting -> satisfied)
         println!("🎯 Testing trigger_action state change...");

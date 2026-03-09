@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/policymanager.proto",
                 "proto/statemanager.proto",
                 "proto/nodeagent.proto",
+                "proto/logd.proto",
                 "proto/external/pharos/pharos_service.proto",
                 "proto/external/timpani/schedinfo.proto",
                 "proto/rocksdbservice.proto", // Add RocksDB service proto

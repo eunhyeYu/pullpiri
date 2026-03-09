@@ -127,6 +127,8 @@ pub mod statemanager {
     }
 }
 
+pub mod logd;
+
 pub mod external {
     pub mod timpani {
         include!("generated/schedinfo.v1.rs");

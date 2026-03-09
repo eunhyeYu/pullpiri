@@ -8,6 +8,7 @@
 use base64::Engine;
 use common::apiserver::{ClusterTopology, TopologyType};
 use common::etcd;
+use common::logd;
 use prost::Message;
 
 /// Node registry for managing cluster topology
@@ -55,7 +56,7 @@ impl NodeRegistry {
 
         etcd::put(topology_key, &topology_json).await?;
 
-        println!("Updated cluster topology: {}", topology.cluster_name);
+        logd!(2, "Updated cluster topology: {}", topology.cluster_name);
         Ok(topology)
     }
 
@@ -156,14 +157,20 @@ mod tests {
                 // Verify the topology structure is valid
                 assert!(topology.master_nodes.is_empty() || !topology.master_nodes.is_empty());
                 assert!(topology.sub_nodes.is_empty() || !topology.sub_nodes.is_empty());
-                println!(
+                logd!(
+                    2,
                     "Successfully got topology: {} ({})",
-                    topology.cluster_name, topology.cluster_id
+                    topology.cluster_name,
+                    topology.cluster_id
                 );
             }
             Err(e) => {
                 // Expected if etcd is not available during testing
-                println!("Expected error getting topology (etcd unavailable): {}", e);
+                logd!(
+                    4,
+                    "Expected error getting topology (etcd unavailable): {}",
+                    e
+                );
             }
         }
     }
@@ -179,13 +186,15 @@ mod tests {
             Ok(topology) => {
                 assert!(!topology.cluster_id.is_empty());
                 assert!(!topology.cluster_name.is_empty());
-                println!(
+                logd!(
+                    2,
                     "Got topology: {} ({})",
-                    topology.cluster_name, topology.cluster_id
+                    topology.cluster_name,
+                    topology.cluster_id
                 );
             }
             Err(e) => {
-                println!("Error getting topology: {}", e);
+                logd!(4, "Error getting topology: {}", e);
             }
         }
     }
@@ -204,10 +213,14 @@ mod tests {
                 assert_eq!(updated_topology.cluster_id, test_topology.cluster_id);
                 assert_eq!(updated_topology.cluster_name, test_topology.cluster_name);
                 assert_eq!(updated_topology.r#type, TopologyType::Embedded as i32);
-                println!("Successfully updated embedded topology");
+                logd!(2, "Successfully updated embedded topology");
             }
             Err(e) => {
-                println!("Expected error updating topology (etcd unavailable): {}", e);
+                logd!(
+                    4,
+                    "Expected error updating topology (etcd unavailable): {}",
+                    e
+                );
             }
         }
     }
@@ -239,10 +252,14 @@ mod tests {
                 assert_eq!(updated_topology.r#type, TopologyType::HybridCloud as i32);
                 assert_eq!(updated_topology.master_nodes.len(), 1);
                 assert_eq!(updated_topology.sub_nodes.len(), 2);
-                println!("Successfully updated hybrid cloud topology");
+                logd!(2, "Successfully updated hybrid cloud topology");
             }
             Err(e) => {
-                println!("Expected error updating topology (etcd unavailable): {}", e);
+                logd!(
+                    4,
+                    "Expected error updating topology (etcd unavailable): {}",
+                    e
+                );
             }
         }
     }
@@ -267,10 +284,14 @@ mod tests {
                 assert_eq!(updated_topology.r#type, TopologyType::MultiCluster as i32);
                 assert_eq!(updated_topology.parent_cluster, "parent-cluster-id");
                 assert!(updated_topology.config.contains_key("cluster_role"));
-                println!("Successfully updated multi-cluster topology");
+                logd!(2, "Successfully updated multi-cluster topology");
             }
             Err(e) => {
-                println!("Expected error updating topology (etcd unavailable): {}", e);
+                logd!(
+                    4,
+                    "Expected error updating topology (etcd unavailable): {}",
+                    e
+                );
             }
         }
     }
@@ -287,10 +308,14 @@ mod tests {
         match registry.update_topology(test_topology.clone()).await {
             Ok(updated_topology) => {
                 assert_eq!(updated_topology.r#type, TopologyType::Distributed as i32);
-                println!("Successfully updated distributed topology");
+                logd!(2, "Successfully updated distributed topology");
             }
             Err(e) => {
-                println!("Expected error updating topology (etcd unavailable): {}", e);
+                logd!(
+                    4,
+                    "Expected error updating topology (etcd unavailable): {}",
+                    e
+                );
             }
         }
     }

@@ -12,6 +12,7 @@ use common::apiserver::{
     UpdateTopologyResponse,
 };
 use common::etcd;
+use common::logd;
 use common::nodeagent::fromapiserver::{
     NodeRegistrationRequest, NodeRegistrationResponse, NodeStatus,
 };
@@ -57,7 +58,7 @@ impl NodeRegistry {
 
         etcd::put(topology_key, &topology_json).await?;
 
-        println!("Updated cluster topology: {}", topology.cluster_name);
+        logd!(2, "Updated cluster topology: {}", topology.cluster_name);
         Ok(topology)
     }
 }
@@ -98,7 +99,7 @@ impl ApiServerConnection for ApiServerReceiver {
         &self,
         request: Request<GetNodesRequest>,
     ) -> Result<Response<GetNodesResponse>, Status> {
-        println!("Received GetNodes request");
+        logd!(1, "Received GetNodes request");
         let _req = request.into_inner();
 
         match self.node_manager.get_nodes().await {
@@ -119,7 +120,7 @@ impl ApiServerConnection for ApiServerReceiver {
         &self,
         request: Request<GetNodeRequest>,
     ) -> Result<Response<GetNodeResponse>, Status> {
-        println!("Received GetNode request");
+        logd!(1, "Received GetNode request");
         let req = request.into_inner();
 
         match self.node_manager.get_node(&req.node_id).await {
@@ -145,17 +146,20 @@ impl ApiServerConnection for ApiServerReceiver {
         &self,
         request: Request<NodeRegistrationRequest>,
     ) -> Result<Response<NodeRegistrationResponse>, Status> {
-        println!("Received RegisterNode request");
+        logd!(1, "Received RegisterNode request");
         let req = request.into_inner();
 
-        println!(
+        logd!(
+            2,
             "Registering node: {} ({}) with ID {}",
-            req.hostname, req.ip_address, req.node_id
+            req.hostname,
+            req.ip_address,
+            req.node_id
         );
 
         // Note: We now use the node_id provided by the nodeagent
         // This should be in the format {node_name}-{node_ip}
-        println!("Using provided node_id: {}", req.node_id);
+        logd!(1, "Using provided node_id: {}", req.node_id);
 
         // Let's update the node status to Ready immediately
         match self.node_manager.register_node(req.clone()).await {
@@ -182,12 +186,12 @@ impl ApiServerConnection for ApiServerReceiver {
                 // 1. IP 주소로 빠른 조회용 (json 문자열로 변경)
                 let _ =
                     common::etcd::put(&format!("nodes/{}", req.ip_address), &req.hostname).await;
-                println!("Hostname stored at IP key: nodes/{}", req.ip_address);
+                logd!(1, "Hostname stored at IP key: nodes/{}", req.ip_address);
 
                 // 2. 호스트 이름으로 빠른 조회용 (ActionController용)
                 let _ =
                     common::etcd::put(&format!("nodes/{}", req.hostname), &req.ip_address).await;
-                println!("Node IP stored at hostname key: nodes/{}", req.hostname);
+                logd!(1, "Node IP stored at hostname key: nodes/{}", req.hostname);
 
                 // Immediately update the node status to Ready
                 if let Err(e) = self
@@ -195,12 +199,13 @@ impl ApiServerConnection for ApiServerReceiver {
                     .update_status(&req.node_id, NodeStatus::Ready)
                     .await
                 {
-                    println!("Warning: Failed to update node status to Ready: {}", e);
+                    logd!(5, "Warning: Failed to update node status to Ready: {}", e);
                 } else {
-                    println!("Successfully updated node status to Ready");
+                    logd!(1, "Successfully updated node status to Ready");
                 }
 
-                println!(
+                logd!(
+                    2,
                     "Node registration successful, cluster token: {}",
                     cluster_token
                 );
@@ -216,7 +221,7 @@ impl ApiServerConnection for ApiServerReceiver {
                 }))
             }
             Err(e) => {
-                println!("Node registration failed: {}", e);
+                logd!(5, "Node registration failed: {}", e);
                 Ok(Response::new(NodeRegistrationResponse {
                     success: false,
                     message: format!("Failed to register node: {}", e),

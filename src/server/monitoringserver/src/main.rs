@@ -13,6 +13,8 @@ pub mod etcd_storage;
 pub mod grpc;
 pub mod manager;
 
+use common::logd;
+use common::logd::logger;
 use common::monitoringserver::monitoring_server_connection_server::MonitoringServerConnectionServer;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
@@ -29,13 +31,13 @@ async fn launch_manager(
 
     match manager.initialize().await {
         Ok(_) => {
-            println!("MonitoringServerManager successfully initialized");
+            logd!(3, "MonitoringServerManager successfully initialized");
             if let Err(e) = manager.run().await {
-                eprintln!("Error running MonitoringServerManager: {:?}", e);
+                logd!(5, "Error running MonitoringServerManager: {:?}", e);
             }
         }
         Err(e) => {
-            eprintln!("Failed to initialize MonitoringServerManager: {:?}", e);
+            logd!(5, "Failed to initialize MonitoringServerManager: {:?}", e);
         }
     }
 }
@@ -59,20 +61,21 @@ async fn initialize(
     let addr = common::monitoringserver::open_server()
         .parse()
         .expect("monitoringserver address parsing error");
-    println!("MonitoringServer listening on {}", addr);
+    logd!(3, "MonitoringServer listening on {}", addr);
 
     if let Err(e) = Server::builder()
         .add_service(MonitoringServerConnectionServer::new(server))
         .serve(addr)
         .await
     {
-        eprintln!("gRPC server error: {}", e);
+        logd!(5, "gRPC server error: {}", e);
     }
 }
 
 #[tokio::main]
 async fn main() {
-    println!("Starting MonitoringServer...");
+    let _ = logger::init_async_logger("monitoringserver").await;
+    logd!(1, "initiailize monitoring server");
 
     let (tx_container, rx_container) = channel::<ContainerList>(100);
     let (tx_node, rx_node) = channel::<NodeInfo>(100);

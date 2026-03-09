@@ -29,6 +29,7 @@
 use crate::types::{
     ActionCommand, ContainerState, HealthStatus, ResourceState, StateTransition, TransitionResult,
 };
+use common::logd;
 use common::spec::artifact::Artifact;
 use common::statemanager::{
     ErrorCode, ModelState, PackageState, ResourceType, ScenarioState, StateChange,
@@ -302,7 +303,7 @@ impl StateMachine {
 
                 // Send action for async execution (non-blocking)
                 if let Err(e) = sender.send(action_command) {
-                    eprintln!("Warning: Failed to queue action for execution: {e}");
+                    logd!(5, "Warning: Failed to queue action for execution: {e}");
                 }
             }
 
@@ -620,7 +621,7 @@ impl StateMachine {
         let package_yaml = match common::etcd::get(&package_key).await {
             Ok(yaml) => yaml,
             Err(e) => {
-                println!("    Failed to get package definition: {:?}", e);
+                logd!(4, "    Failed to get package definition: {:?}", e);
                 return Ok(Vec::new());
             }
         };
@@ -629,7 +630,7 @@ impl StateMachine {
         let package: common::spec::artifact::Package = match serde_yaml::from_str(&package_yaml) {
             Ok(pkg) => pkg,
             Err(e) => {
-                println!("    Failed to parse package YAML: {:?}", e);
+                logd!(4, "    Failed to parse package YAML: {:?}", e);
                 return Ok(Vec::new());
             }
         };
@@ -684,13 +685,13 @@ impl StateMachine {
                             }
                         }
                         Err(e) => {
-                            println!("    Failed to parse package {}: {:?}", kv.0, e);
+                            logd!(4, "    Failed to parse package {}: {:?}", kv.0, e);
                         }
                     }
                 }
             }
             Err(e) => {
-                println!("    Failed to get packages from ETCD: {:?}", e);
+                logd!(5, "    Failed to get packages from ETCD: {:?}", e);
                 return Err(format!("Failed to get packages from ETCD: {:?}", e));
             }
         }
@@ -730,13 +731,13 @@ impl StateMachine {
         &self,
         package_name: &str,
     ) -> std::result::Result<(bool, common::statemanager::PackageState), String> {
-        println!("    Evaluating package state for: {}", package_name);
+        logd!(2, "    Evaluating package state for: {}", package_name);
 
         // Get model states for this package
         let model_states = Self::get_models_for_package(package_name).await?;
 
         if model_states.is_empty() {
-            println!("      No models found for package {}", package_name);
+            logd!(4, "      No models found for package {}", package_name);
             return Ok((false, common::statemanager::PackageState::Idle));
         }
 
@@ -778,13 +779,15 @@ impl StateMachine {
         // Check if package state changed
         let state_changed = new_package_state != current_package_state;
         if state_changed {
-            println!(
+            logd!(
+                1,
                 "      Package state changed: {} -> {}",
                 current_package_state.as_str_name(),
                 new_package_state.as_str_name()
             );
         } else {
-            println!(
+            logd!(
+                1,
                 "      Package {} state unchanged: {}",
                 package_name,
                 current_package_state.as_str_name()

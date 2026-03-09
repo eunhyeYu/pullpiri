@@ -230,6 +230,70 @@ pub async fn get_all_containers() -> common::Result<Vec<ContainerInfo>> {
     Ok(containers)
 }
 
+/// Delete all containers from etcd (used on startup to clear stale data)
+/// Retries up to 10 times with 1 second intervals if DB is not ready
+pub async fn delete_all_containers() -> common::Result<()> {
+    use tokio::time::{sleep, Duration};
+
+    let prefix = "/piccolo/metrics/containers/".to_string();
+    const MAX_RETRIES: u32 = 10;
+    const RETRY_INTERVAL_SECS: u64 = 1;
+
+    // Retry logic for get_all_with_prefix
+    let kv_pairs = {
+        let mut last_error = String::new();
+        let mut result = None;
+
+        for attempt in 1..=MAX_RETRIES {
+            match common::etcd::get_all_with_prefix(&prefix).await {
+                Ok(pairs) => {
+                    result = Some(pairs);
+                    break;
+                }
+                Err(e) => {
+                    last_error = e.to_string();
+                    eprintln!(
+                        "[ETCD] Attempt {}/{}: Failed to connect to DB, retrying in {}s... ({})",
+                        attempt, MAX_RETRIES, RETRY_INTERVAL_SECS, last_error
+                    );
+                    if attempt < MAX_RETRIES {
+                        sleep(Duration::from_secs(RETRY_INTERVAL_SECS)).await;
+                    }
+                }
+            }
+        }
+
+        match result {
+            Some(pairs) => pairs,
+            None => {
+                eprintln!(
+                    "[ETCD] Warning: Failed to clear containers after {} retries: {}",
+                    MAX_RETRIES, last_error
+                );
+                return Ok(()); // Continue to next step even on failure
+            }
+        }
+    };
+
+    let mut deleted_count = 0;
+    for (key, _) in kv_pairs {
+        if let Err(e) = common::etcd::delete(&key).await {
+            eprintln!(
+                "[ETCD] Warning: Failed to delete container key {}: {}",
+                key, e
+            );
+        } else {
+            deleted_count += 1;
+        }
+    }
+
+    println!(
+        "[ETCD] Cleared {} containers from etcd on startup",
+        deleted_count
+    );
+    Ok(())
+}
+
 /// Store a raw stress metric JSON string in etcd under /piccolo/metrics/stress/{process}/{pid}:{ts}
 pub async fn store_stress_metric_json(json_str: &str) -> common::Result<()> {
     // parse & validate JSON

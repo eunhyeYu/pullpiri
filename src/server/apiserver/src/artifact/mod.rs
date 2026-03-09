@@ -7,6 +7,7 @@
 
 pub mod data;
 
+use common::logd;
 use common::spec::artifact::{Artifact, Model, Network, Node, Package, Scenario, Volume};
 use common::spec::k8s::Pod;
 
@@ -67,18 +68,27 @@ async fn notify_scenario_state(scenario_name: &str, target_state: &str) {
         source: "apiserver".to_string(),
     };
 
-    println!("🔄 SCENARIO STATE INITIALIZATION: ApiServer Setting Initial State");
-    println!("   📋 Scenario: {}", scenario_name);
-    println!("   🔄 Initial State: → {}", target_state);
-    println!("   📤 Sending StateChange to StateManager");
+    logd!(
+        1,
+        "🔄 SCENARIO STATE INITIALIZATION: ApiServer Setting Initial State"
+    );
+    logd!(1, "   📋 Scenario: {}", scenario_name);
+    logd!(1, "   🔄 Initial State: → {}", target_state);
+    logd!(1, "   📤 Sending StateChange to StateManager");
 
     let mut state_sender = crate::grpc::sender::statemanager::StateManagerSender::new();
     match state_sender.send_state_change(state_change).await {
-        Ok(_) => println!(
+        Ok(_) => logd!(
+            2,
             "   ✅ Successfully set scenario {} to {} state",
-            scenario_name, target_state
+            scenario_name,
+            target_state
         ),
-        Err(e) => println!("   ❌ Failed to send state change to StateManager: {:?}", e),
+        Err(e) => logd!(
+            5,
+            "   ❌ Failed to send state change to StateManager: {:?}",
+            e
+        ),
     }
 }
 
@@ -89,7 +99,8 @@ async fn process_artifact_document(doc: &str) -> common::Result<Option<(String, 
     let parse_start = Instant::now();
     let value: serde_yaml::Value = serde_yaml::from_str(doc)?;
     let artifact_str = serde_yaml::to_string(&value)?;
-    println!(
+    logd!(
+        1,
         "process_artifact: YAML parse elapsed = {:?}",
         parse_start.elapsed()
     );
@@ -97,7 +108,7 @@ async fn process_artifact_document(doc: &str) -> common::Result<Option<(String, 
     let (kind, name) = match parse_artifact_info(&value) {
         Some(info) => info,
         None => {
-            println!("Unknown or invalid artifact");
+            logd!(5, "Unknown or invalid artifact");
             return Ok(None);
         }
     };
@@ -106,7 +117,8 @@ async fn process_artifact_document(doc: &str) -> common::Result<Option<(String, 
 
     let etcd_start = Instant::now();
     data::write_to_etcd(&key, &artifact_str).await?;
-    println!(
+    logd!(
+        1,
         "process_artifact: etcd write elapsed for {} = {:?}",
         key,
         etcd_start.elapsed()
@@ -145,7 +157,7 @@ pub async fn apply(body: &str) -> common::Result<String> {
         }
     }
 
-    println!("apply: total elapsed = {:?}", total_start.elapsed());
+    logd!(1, "apply: total elapsed = {:?}", total_start.elapsed());
 
     if scenario_str.is_empty() {
         Err("There is not any scenario in yaml string".into())

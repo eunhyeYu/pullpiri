@@ -2,6 +2,8 @@
 * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
 * SPDX-License-Identifier: Apache-2.0
 */
+use common::logd;
+use common::logd::logger;
 use std::error::Error;
 
 mod grpc;
@@ -30,11 +32,15 @@ async fn initialize(skip_grpc: bool) -> Result<(), Box<dyn Error>> {
     let node_type = &config.host.r#type;
 
     /*if node_type == "bluechi" {
-        println!("Adding {} to bluechi_nodes from settings.yaml", hostname);
+        logd!(2, "Adding {} to bluechi_nodes from settings.yaml", hostname);
         manager.bluechi_nodes.push(hostname.clone());
     } else*/
     {
-        println!("Adding {} to nodeagent_nodes from settings.yaml", hostname);
+        logd!(
+            2,
+            "Adding {} to nodeagent_nodes from settings.yaml",
+            hostname
+        );
         manager.nodeagent_nodes.push(hostname.clone());
     }
 
@@ -59,7 +65,8 @@ async fn initialize(skip_grpc: bool) -> Result<(), Box<dyn Error>> {
 /// critical error during operation.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    println!("Starting ActionController...");
+    let _ = logger::init_async_logger("actioncontroller").await;
+    logd!(1, "initiailize action controller");
 
     // Initialize the controller
     initialize(false).await?;
@@ -68,7 +75,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Keep the application running
     tokio::signal::ctrl_c().await?;
-    println!("Shutting down ActionController...");
+    logd!(3, "Shutting down ActionController...");
 
     Ok(())
 }

@@ -37,30 +37,13 @@ all-images: image rocksdb-image
 	@echo "  - localhost/pullpiri:latest (main services)"
 	@echo "  - localhost/pullpiri-rocksdb:latest (RocksDB service)"
 
-.PHONY: setup-shared-rocksdb
-setup-shared-rocksdb:
-	-mkdir -p /etc/piccolo/pullpiri_shared_rocksdb
-	-chown 1001:1001 /etc/piccolo/pullpiri_shared_rocksdb
-
 .PHONY: install
-install: setup-shared-rocksdb
-	-mkdir -p /etc/piccolo
-	-cp -r ./src/settings.yaml /etc/piccolo/
-	-cp -r ./doc/scripts/version.txt /etc/piccolo/
-	-cp -r ./doc/scripts/update_server_ip.sh /etc/piccolo/
-	-cp -r ./containers/piccolo-*.* /etc/piccolo/
-	-./containers/piccolo-server.sh dev
-	-./containers/piccolo-player.sh dev
+install:
+	-./containers/install-piccolo.sh
 
 .PHONY: uninstall
 uninstall:
-	-podman pod stop -t 0 piccolo-player
-	-podman pod rm -f --ignore piccolo-player
-	-podman pod stop -t 0 piccolo-server
-	-podman pod rm -f --ignore piccolo-server
-	-cp -r /etc/piccolo/nodeagent.yaml /etc/nodeagent.yaml.bak
-	-rm -rf /etc/piccolo/*
-	-mv /etc/nodeagent.yaml.bak /etc/piccolo/nodeagent.yaml
+	-./containers/uninstall-piccolo.sh
 
 # DO NOT USE THIS COMMAND IN PRODUCTION
 #.PHONY: rocksdb-image
@@ -68,6 +51,14 @@ uninstall:
 #	docker buildx create --name container-builder --driver docker-container --bootstrap --use
 #	docker run --privileged --rm tonistiigi/binfmt --install all
 #	docker buildx build --push --platform linux/amd64,linux/arm64 -t ghcr.io/mco-piccolo/pullpiri-rocksdb:v11.18.0 -f src/server/rocksdbservice/Dockerfile .
+
+.PHONY: dev-install
+dev-install:
+	-./containers/devonly/install-piccolo.sh
+
+.PHONY: dev-uninstall
+dev-uninstall:
+	-./containers/devonly/uninstall-piccolo.sh
 
 .PHONY: tools
 tools:

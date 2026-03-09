@@ -20,15 +20,21 @@ mod manager;
 mod node;
 mod route;
 
+use common::logd;
+use common::logd::logger;
+
 /// Main function of Piccolo API Server
 #[cfg(feature = "tarpaulin_include")]
 fn main() {
     // Dummy main for coverage builds
-    println!("Tarpaulin coverage build: main function stub.");
+    logd!(0, "Tarpaulin coverage build: main function stub.");
 }
 #[cfg(not(feature = "tarpaulin_include"))]
 #[tokio::main]
 async fn main() {
+    let _ = logger::init_async_logger("apiserver").await;
+    logd!(1, "initiailize api server");
+
     manager::initialize().await
 }
 

@@ -2,6 +2,7 @@
 * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
 * SPDX-License-Identifier: Apache-2.0
 */
+use common::logd;
 use common::nodeagent::fromapiserver::{HandleYamlRequest, HandleYamlResponse};
 use common::nodeagent::node_agent_connection_client::NodeAgentConnectionClient;
 use tonic::{Request, Response, Status};
@@ -19,7 +20,7 @@ pub async fn send_to_node(
     };
     let addr = format!("http://{}:47004", fixed_ip);
 
-    println!("Attempting to connect to NodeAgent at: {}", addr);
+    logd!(2, "Attempting to connect to NodeAgent at: {}", addr);
 
     // Attempting to connect with a timeout
     let client_result = tokio::time::timeout(
@@ -30,7 +31,7 @@ pub async fn send_to_node(
 
     match client_result {
         Ok(Ok(mut client)) => {
-            println!("Successfully connected to NodeAgent, sending request...");
+            logd!(2, "Successfully connected to NodeAgent, sending request...");
             match tokio::time::timeout(
                 std::time::Duration::from_secs(1),
                 client.handle_yaml(Request::new(action)),
@@ -39,11 +40,11 @@ pub async fn send_to_node(
             {
                 Ok(result) => match result {
                     Ok(response) => {
-                        println!("Request to NodeAgent successful");
+                        logd!(1, "Request to NodeAgent successful");
                         Ok(response)
                     }
                     Err(e) => {
-                        eprintln!("Error calling NodeAgent handle_yaml: {}", e);
+                        logd!(5, "Error calling NodeAgent handle_yaml: {}", e);
                         Err(Status::internal(format!(
                             "Error calling NodeAgent handle_yaml: {}",
                             e
@@ -51,7 +52,7 @@ pub async fn send_to_node(
                     }
                 },
                 Err(_) => {
-                    eprintln!("Timeout while waiting for NodeAgent to respond");
+                    logd!(5, "Timeout while waiting for NodeAgent to respond");
                     Err(Status::deadline_exceeded(
                         "Timeout while waiting for NodeAgent to respond",
                     ))
@@ -59,15 +60,15 @@ pub async fn send_to_node(
             }
         }
         Ok(Err(e)) => {
-            eprintln!("Error connecting to NodeAgent at {}: {}", addr, e);
-            eprintln!("Connection error details: {:?}", e);
+            logd!(5, "Error connecting to NodeAgent at {}: {}", addr, e);
+            logd!(5, "Connection error details: {:?}", e);
             Err(Status::unavailable(format!(
                 "Failed to connect to NodeAgent at {}: {}",
                 addr, e
             )))
         }
         Err(_) => {
-            eprintln!("Timeout while connecting to NodeAgent at {}", addr);
+            logd!(5, "Timeout while connecting to NodeAgent at {}", addr);
             Err(Status::deadline_exceeded(format!(
                 "Timeout while connecting to NodeAgent at {}",
                 addr
@@ -99,19 +100,23 @@ pub async fn send_guest(
     let mut responses = Vec::new();
 
     for guest_node in guest_nodes {
-        println!(
+        logd!(
+            2,
             "Sending to guest node: {} ({})",
-            guest_node.node_id, guest_node.ip_address
+            guest_node.node_id,
+            guest_node.ip_address
         );
         match send_to_node(action.clone(), guest_node.ip_address.clone()).await {
             Ok(response) => {
-                println!("Successfully sent to guest node: {}", guest_node.node_id);
+                logd!(1, "Successfully sent to guest node: {}", guest_node.node_id);
                 responses.push(response);
             }
             Err(e) => {
-                println!(
+                logd!(
+                    5,
                     "Failed to send to guest node {}: {:?}",
-                    guest_node.node_id, e
+                    guest_node.node_id,
+                    e
                 );
                 // 오류는 기록하지만 계속 다른 노드에 전송 시도
             }
@@ -270,7 +275,7 @@ spec:
         ];
 
         for (test_name, action) in test_cases {
-            println!("Testing: {}", test_name);
+            logd!(1, "Testing: {}", test_name);
             let node_ip = "127.0.0.1".to_string();
 
             let result = send_to_node(action, node_ip).await;

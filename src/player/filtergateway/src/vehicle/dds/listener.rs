@@ -41,8 +41,7 @@ use serde_json::Value;
 
 use async_trait::async_trait;
 // use clap::Parser;
-use common;
-use log::{debug, error, info, warn};
+use common::logd;
 // use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -137,7 +136,7 @@ impl DdsTopicListener for TopicListener {
         // Spawn the listener task
         let task = tokio::spawn(async move {
             if let Err(e) = Self::listener_loop(topic_name, data_type_name, tx, domain_id).await {
-                error!("Error in listener loop: {:?}", e);
+                logd!(5, "Error in listener loop: {:?}", e);
             }
         });
 
@@ -176,7 +175,7 @@ impl TopicListener {
         domain_id: i32,
     ) -> Result<()> {
         // 도메인 참여자 생성
-        info!("Generic listener started for topic '{}'", topic_name);
+        logd!(3, "Generic listener started for topic '{}'", topic_name);
 
         let domain_participant_factory = DomainParticipantFactory::get_instance();
         let participant = domain_participant_factory
@@ -191,9 +190,11 @@ impl TopicListener {
 
         // IDL 타입 정보를 유동적으로 처리
         // 토픽 메타데이터에 따라 데이터 처리를 다르게 함
-        info!(
+        logd!(
+            3,
             "Setting up listener for topic {} of type {}",
-            topic_name, data_type_name
+            topic_name,
+            data_type_name
         );
 
         // 메시지 수신 루프
@@ -211,7 +212,7 @@ impl TopicListener {
 
             // 데이터 전송 채널이 닫히면 루프 종료
             if tx.send(dds_data).await.is_err() {
-                warn!("Channel closed, stopping listener for {}", topic_name);
+                logd!(4, "Channel closed, stopping listener for {}", topic_name);
                 break;
             }
         }
@@ -307,7 +308,8 @@ impl<
             .create_datareader::<T>(&topic, QosKind::Default, None, NO_STATUS)
             .map_err(|e| anyhow!("Failed to create data reader: {:?}", e))?;
 
-        println!(
+        logd!(
+            3,
             "Successfully created data reader for topic '{}'",
             topic_name
         );
@@ -350,14 +352,14 @@ impl<
 
                             // Send data through channel
                             if tx.send(dds_data).await.is_err() {
-                                warn!("Channel closed, stopping listener for {}", topic_name);
+                                logd!(4, "Channel closed, stopping listener for {}", topic_name);
                                 return Ok(());
                             }
                         }
                     }
                 }
                 Err(e) => {
-                    debug!("No new samples available: {:?}", e);
+                    logd!(5, "No new samples available: {:?}", e);
                 }
             }
         }
@@ -395,7 +397,12 @@ impl<
             if let Err(e) =
                 Self::typed_listener_loop(topic_name.clone(), data_type_name, tx, domain_id).await
             {
-                error!("Error in typed listener loop for {}: {:?}", topic_name, e);
+                logd!(
+                    5,
+                    "Error in typed listener loop for {}: {:?}",
+                    topic_name,
+                    e
+                );
             }
         });
 

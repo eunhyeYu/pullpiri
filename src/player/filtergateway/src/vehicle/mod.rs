@@ -4,6 +4,7 @@
 */
 pub mod dds;
 
+use common::logd;
 use common::Result;
 use dds::DdsData;
 use tokio::sync::mpsc::Sender;
@@ -41,7 +42,7 @@ impl VehicleManager {
         match self.dds_manager.init().await {
             Ok(_) => {}
             Err(e) => {
-                log::warn!("Failed to initialize DDS manager with settings file: {}. Using default settings.", e);
+                logd!(5, "Failed to initialize DDS manager with settings file: {}. Using default settings.", e);
                 // 기본 설정 적용
                 self.set_domain_id(100); // Set default domain ID
             }
@@ -72,7 +73,7 @@ impl VehicleManager {
             .await?;
 
         let elapsed = start.elapsed();
-        println!("subscribe_topic: elapsed = {:?}", elapsed);
+        logd!(1, "subscribe_topic: elapsed = {:?}", elapsed);
 
         Ok(())
     }

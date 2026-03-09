@@ -13,6 +13,7 @@
 //! including state changes, resource queries, recovery management, and event notifications.
 pub mod timpani;
 
+use common::logd;
 use common::monitoringserver::{ContainerList, SendContainerListResponse};
 use common::statemanager::{
     state_manager_connection_server::StateManagerConnection,
@@ -193,17 +194,21 @@ impl StateManagerConnection for StateManagerReceiver {
         }
 
         // Log comprehensive state change information for monitoring
-        println!("StateChange received:");
-        println!(
+        logd!(1, "StateChange received:");
+        logd!(
+            1,
             "  Resource: {} {}",
             self.resource_type_to_string(req.resource_type),
             req.resource_name
         );
-        println!(
+
+        logd!(
+            1,
             "  Transition: {} -> {}",
-            req.current_state, req.target_state
+            req.current_state,
+            req.target_state
         );
-        println!("  ID: {}, Source: {}", req.transition_id, req.source);
+        logd!(1, "  ID: {}, Source: {}", req.transition_id, req.source);
 
         // Forward StateChange to StateManager's state machine engine
         match self.tx_state_change.send(req).await {
@@ -223,7 +228,7 @@ impl StateManagerConnection for StateManagerReceiver {
             }
             Err(e) => {
                 // Channel send failed - StateManager unavailable or overloaded
-                eprintln!("Failed to forward StateChange to StateManager: {e}");
+                logd!(5, "Failed to forward StateChange to StateManager: {e}");
                 Ok(tonic::Response::new(StateChangeResponse {
                     message: "StateManager service unavailable".to_string(),
                     transition_id, // Preserve original ID for tracking

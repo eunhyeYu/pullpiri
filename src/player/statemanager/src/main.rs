@@ -12,6 +12,8 @@
 //! The StateManager service is a core component of the PICCOLO framework, responsible for managing
 //! resource state transitions, monitoring container health, and ensuring ASIL-compliant operation.
 
+use common::logd;
+use common::logd::logger;
 use common::monitoringserver::ContainerList;
 use common::statemanager::{
     state_manager_connection_server::StateManagerConnectionServer, StateChange,
@@ -52,10 +54,10 @@ async fn launch_manager(
     // In test mode we short-circuit heavy startup to keep unit tests fast
     // In test builds or when `PULLPIRI_TEST_MODE` is set we short-circuit heavy startup
     if cfg!(test) || env::var("PULLPIRI_TEST_MODE").is_ok() {
-        println!("Test mode: skipping StateManagerManager startup");
+        logd!(1, "Test mode: skipping StateManagerManager startup");
         return;
     }
-    println!("=== StateManagerManager Starting ===");
+    logd!(3, "=== StateManagerManager Starting ===");
 
     // Create the StateManager engine with async channel receivers
     let mut manager = manager::StateManagerManager::new(rx_container, rx_state_change).await;
@@ -63,25 +65,34 @@ async fn launch_manager(
     // Initialize the manager with configuration and persistent state
     match manager.initialize().await {
         Ok(_) => {
-            println!("StateManagerManager initialization completed successfully");
+            logd!(
+                3,
+                "StateManagerManager initialization completed successfully"
+            );
 
             // Run the main processing loop
-            println!("Starting StateManagerManager main processing loop...");
+            logd!(3, "Starting StateManagerManager main processing loop...");
             if let Err(e) = manager.run().await {
-                eprintln!("StateManagerManager stopped with error: {e:?}");
-                eprintln!("This may indicate a critical system failure or shutdown request");
+                logd!(5, "StateManagerManager stopped with error: {e:?}");
+                logd!(
+                    5,
+                    "This may indicate a critical system failure or shutdown request"
+                );
             } else {
-                println!("StateManagerManager stopped gracefully");
+                logd!(4, "StateManagerManager stopped gracefully");
             }
         }
         Err(e) => {
-            eprintln!("Failed to initialize StateManagerManager: {e:?}");
-            eprintln!("StateManager service cannot start - check configuration and dependencies");
+            logd!(5, "Failed to initialize StateManagerManager: {e:?}");
+            logd!(
+                5,
+                "StateManager service cannot start - check configuration and dependencies"
+            );
             // Don't panic - allow graceful shutdown of other components
         }
     }
 
-    println!("=== StateManagerManager Stopped ===");
+    logd!(4, "=== StateManagerManager Stopped ===");
 }
 
 /// Initializes and runs the StateManager gRPC server.
@@ -112,80 +123,84 @@ async fn initialize_grpc_server(
     // Allow tests to opt-out of starting the actual gRPC server
     // Skip starting the real gRPC server when running tests or explicitly requested
     if cfg!(test) || env::var("PULLPIRI_TEST_MODE").is_ok() {
-        println!("Test mode: skipping gRPC server startup");
+        logd!(1, "Test mode: skipping gRPC server startup");
         return;
     }
-    println!("=== StateManager gRPC Server Starting ===");
+    logd!(3, "=== StateManager gRPC Server Starting ===");
 
     // Create the gRPC service handler with async channels
     let server = grpc::receiver::StateManagerReceiver {
         tx: tx_container,
         tx_state_change,
     };
-    println!("StateManagerReceiver instance created successfully");
+    logd!(3, "StateManagerReceiver instance created successfully");
 
     // Parse the server address from configuration
     let addr = match common::statemanager::open_server().parse() {
         Ok(addr) => {
-            println!("StateManager gRPC server will bind to: {addr}");
+            logd!(3, "StateManager gRPC server will bind to: {addr}");
             addr
         }
         Err(e) => {
-            eprintln!("Failed to parse StateManager server address: {e:?}");
-            eprintln!("Check StateManager address configuration in common module");
+            logd!(5, "Failed to parse StateManager server address: {e:?}");
+            logd!(
+                5,
+                "Check StateManager address configuration in common module"
+            );
             return; // Exit gracefully without panicking
         }
     };
 
     // Start the gRPC server with comprehensive error handling
-    println!("Starting StateManager gRPC server...");
+    logd!(3, "Starting StateManager gRPC server...");
     match Server::builder()
         .add_service(StateManagerConnectionServer::new(server))
         .serve(addr)
         .await
     {
         Ok(_) => {
-            println!("StateManager gRPC server stopped gracefully");
+            logd!(4, "StateManager gRPC server stopped gracefully");
         }
         Err(e) => {
-            eprintln!("StateManager gRPC server error: {e:?}");
-            eprintln!(
+            logd!(5, "StateManager gRPC server error: {e:?}");
+            logd!(
+                5,
                 "This may indicate network issues, port conflicts, or configuration problems"
             );
         }
     }
 
-    println!("=== StateManager gRPC Server Stopped ===");
+    logd!(4, "=== StateManager gRPC Server Stopped ===");
 }
 
 async fn initialize_timpani_server() {
     // Allow tests to opt-out of starting the timpani server
     // Skip starting the timpani server when running tests or explicitly requested
     if cfg!(test) || env::var("PULLPIRI_TEST_MODE").is_ok() {
-        println!("Test mode: skipping Timpani server startup");
+        logd!(1, "Test mode: skipping Timpani server startup");
         return;
     }
-    println!("=== Timpani gRPC Server Starting ===");
+    logd!(3, "=== Timpani gRPC Server Starting ===");
 
     // Create the gRPC service handler for Timpani
     let timpani_server = grpc::receiver::timpani::TimpaniReceiver::default();
-    println!("TimpaniReceiver instance created successfully");
+    logd!(3, "TimpaniReceiver instance created successfully");
 
     // Parse the Timpani server address from configuration
     let addr = match "127.0.0.1:50053".parse() {
         Ok(addr) => {
-            println!("Timpani gRPC server will bind to: {addr}");
+            logd!(3, "Timpani gRPC server will bind to: {addr}");
             addr
         }
         Err(e) => {
-            eprintln!("Failed to parse Timpani server address: {e:?}");
-            eprintln!("Check Timpani address configuration in common module");
+            logd!(5, "Failed to parse Timpani server address: {e:?}");
+            logd!(5, "Check Timpani address configuration in common module");
             return; // Exit gracefully without panicking
         }
     };
 
     // Start the gRPC server for Timpani with comprehensive error handling
-    println!("Starting Timpani gRPC server...");
+    logd!(3, "Starting Timpani gRPC server...");
     match Server::builder()
         .add_service(
             common::external::timpani::fault_service_server::FaultServiceServer::new(
@@ -196,17 +211,18 @@ async fn initialize_timpani_server() {
         .await
     {
         Ok(_) => {
-            println!("Timpani gRPC server stopped gracefully");
+            logd!(4, "Timpani gRPC server stopped gracefully");
         }
         Err(e) => {
-            eprintln!("Timpani gRPC server error: {e:?}");
-            eprintln!(
+            logd!(5, "Timpani gRPC server error: {e:?}");
+            logd!(
+                5,
                 "This may indicate network issues, port conflicts, or configuration problems"
             );
         }
     }
 
-    println!("=== Timpani gRPC Server Stopped ===");
+    logd!(4, "=== Timpani gRPC Server Stopped ===");
 }
 
 /// Main entry point for the StateManager service.
@@ -234,19 +250,13 @@ async fn initialize_timpani_server() {
 /// - Graceful shutdown even if one component fails
 #[tokio::main]
 async fn main() {
-    println!("========================================");
-    println!("         PICCOLO StateManager           ");
-    println!("========================================");
-    println!("Starting StateManager service...");
+    let _ = logger::init_async_logger("statemanager").await;
+    logd!(1, "initiailize statemanager...");
 
     // Create async channels for communication between gRPC server and processing engine
     // Buffer size of 100 provides good throughput while preventing excessive memory usage
     let (tx_container, rx_container) = channel::<ContainerList>(100);
     let (tx_state_change, rx_state_change) = channel::<StateChange>(100);
-
-    println!("Async communication channels created:");
-    println!("  - ContainerList channel: 100 message buffer");
-    println!("  - StateChange channel: 100 message buffer");
 
     // Launch StateManager processing engine
     let manager_task = launch_manager(rx_container, rx_state_change);
@@ -257,20 +267,12 @@ async fn main() {
     // Launch gRPC server for timpani deadline miss
     let timpani_task = initialize_timpani_server();
 
-    println!("Launching StateManager components concurrently...");
-
     // Run both components concurrently until shutdown
     // tokio::join! ensures both tasks complete before main exits
     tokio::join!(manager_task, grpc_task, timpani_task);
 
     // Both tasks return (), but we log completion for monitoring
-    println!("StateManager service components have stopped:");
-    println!("  - StateManager engine: completed");
-    println!("  - gRPC server: completed");
-
-    println!("========================================");
-    println!("     StateManager Service Stopped      ");
-    println!("========================================");
+    logd!(6, "statemanager service stopped");
 }
 
 #[cfg(test)]

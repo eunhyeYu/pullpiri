@@ -30,7 +30,7 @@ pub async fn send(
     let response = client.handle_scenario(Request::new(scenario)).await;
 
     let elapsed = start.elapsed();
-    println!("send: elapsed = {:?}", elapsed);
+    common::logd!(1, "send: elapsed = {:?}", elapsed);
 
     response
 }

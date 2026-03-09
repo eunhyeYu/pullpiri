@@ -36,7 +36,7 @@ async fn health() -> Response {
 /// ### Parametets
 /// * `artifact_name: String` - name of the newly released artifact
 async fn notify(artifact_name: String) -> Response {
-    println!("{}", artifact_name);
+    common::logd!(2, "{}", artifact_name);
 
     super::status(Ok(()))
 }

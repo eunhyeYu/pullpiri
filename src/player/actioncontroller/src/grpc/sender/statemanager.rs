@@ -431,11 +431,6 @@ mod tests {
                 state_response.timestamp_ns > 0,
                 "Response should include processing timestamp"
             );
-
-            println!("ActionController StateChange test completed successfully:");
-            println!("  Message: {}", state_response.message);
-            println!("  Transition ID: {}", state_response.transition_id);
-            println!("  Processing time: {} ns", state_response.timestamp_ns);
         }
     }
 
@@ -464,10 +459,6 @@ mod tests {
         if let Ok(response) = result {
             let state_response = response.into_inner();
             assert!(state_response.transition_id.contains("deploy-model-123"));
-            println!(
-                "Action success report test completed: {}",
-                state_response.message
-            );
         }
     }
 
@@ -498,10 +489,6 @@ mod tests {
             assert!(state_response
                 .transition_id
                 .contains("error-mount-volume-456"));
-            println!(
-                "Action failure report test completed: {}",
-                state_response.message
-            );
         }
     }
 
@@ -532,10 +519,6 @@ mod tests {
             assert!(state_response
                 .transition_id
                 .contains("recovery-recovery-789"));
-            println!(
-                "Recovery success report test completed: {}",
-                state_response.message
-            );
         }
     }
 }

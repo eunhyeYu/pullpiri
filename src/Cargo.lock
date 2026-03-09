@@ -8,7 +8,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "common",
- "prost 0.13.5",
+ "prost",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -100,9 +100,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.100"
+version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "apiserver"
@@ -113,7 +113,7 @@ dependencies = [
  "chrono",
  "common",
  "futures",
- "prost 0.13.5",
+ "prost",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -352,9 +352,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chrono"
-version = "0.4.42"
+version = "0.4.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
+checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
 dependencies = [
  "iana-time-zone",
  "js-sys",
@@ -423,10 +423,14 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 name = "common"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
  "config",
  "const_format",
  "lazy_static",
- "prost 0.13.5",
+ "libc",
+ "prost",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -703,10 +707,9 @@ dependencies = [
  "dust_dds_derive",
  "env_logger",
  "idl-parser",
- "log",
  "mockall",
  "once_cell",
- "prost 0.13.5",
+ "prost",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1424,9 +1427,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.177"
+version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
 
 [[package]]
 name = "linux-raw-sys"
@@ -1454,6 +1457,20 @@ name = "log"
 version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
+
+[[package]]
+name = "logservice"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "common",
+ "prost",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+]
 
 [[package]]
 name = "matchers"
@@ -1541,7 +1558,7 @@ name = "monitoringserver"
 version = "0.1.0"
 dependencies = [
  "common",
- "prost 0.14.1",
+ "prost",
  "serde",
  "serde_json",
  "tokio",
@@ -2004,17 +2021,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5"
 dependencies = [
  "bytes",
- "prost-derive 0.13.5",
-]
-
-[[package]]
-name = "prost"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7231bd9b3d3d33c86b58adbac74b5ec0ad9f496b19d22801d773636feaa95f3d"
-dependencies = [
- "bytes",
- "prost-derive 0.14.1",
+ "prost-derive",
 ]
 
 [[package]]
@@ -2030,7 +2037,7 @@ dependencies = [
  "once_cell",
  "petgraph",
  "prettyplease",
- "prost 0.13.5",
+ "prost",
  "prost-types",
  "regex",
  "syn 2.0.110",
@@ -2051,25 +2058,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost-derive"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9120690fafc389a67ba3803df527d0ec9cbbc9cc45e4cc20b332996dfb672425"
-dependencies = [
- "anyhow",
- "itertools 0.14.0",
- "proc-macro2",
- "quote",
- "syn 2.0.110",
-]
-
-[[package]]
 name = "prost-types"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
 dependencies = [
- "prost 0.13.5",
+ "prost",
 ]
 
 [[package]]
@@ -2829,13 +2823,14 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.17"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eca58d7bba4a75707817a2c44174253f9236b2d5fbd055602e9d5c07c139a047"
+checksum = "32da49809aab5c3bc678af03902d4ccddea2a87d028d86392a4b1560c6906c70"
 dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -2956,7 +2951,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
- "prost 0.13.5",
+ "prost",
  "socket2 0.5.10",
  "tokio",
  "tokio-stream",

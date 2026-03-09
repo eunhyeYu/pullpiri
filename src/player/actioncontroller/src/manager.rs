@@ -6,6 +6,7 @@ use std::{collections::HashMap, thread, time::Duration};
 
 use crate::grpc::sender::pharos::request_network_pod;
 use crate::grpc::sender::statemanager::StateManagerSender;
+use common::logd;
 use common::{
     actioncontroller::PodStatus as Status,
     spec::artifact::{package::ModelInfo, Model, Package, Scenario},
@@ -78,9 +79,11 @@ impl ActionControllerManager {
         let node_ip = match common::etcd::get(&node_info_key).await {
             Ok(ip) => ip,
             Err(e) => {
-                println!(
+                logd!(
+                    4,
                     "Warning: Failed to get IP for node '{}' from etcd: {}",
-                    node_name, e
+                    node_name,
+                    e
                 );
                 self.get_fallback_node_ip(node_name)?
             }
@@ -90,9 +93,11 @@ impl ActionControllerManager {
         let node_json = match common::etcd::get(&cluster_node_key).await {
             Ok(value) => value,
             Err(e) => {
-                println!(
+                logd!(
+                    4,
                     "Warning: Failed to get details for node '{}' from etcd: {}",
-                    node_name, e
+                    node_name,
+                    e
                 );
                 return self.get_fallback_node_role(node_name);
             }
@@ -105,7 +110,7 @@ impl ActionControllerManager {
             return Err(format!("Unknown node role: {}", node_info.node_role).into());
         };
 
-        println!("Node {} role loaded from etcd: {}", node_name, role);
+        logd!(2, "Node {} role loaded from etcd: {}", node_name, role);
         Ok(role)
     }
 
@@ -113,7 +118,7 @@ impl ActionControllerManager {
     fn get_fallback_node_ip(&self, node_name: &str) -> Result<String> {
         let config = common::setting::get_config();
         if config.host.name == node_name {
-            println!("Using host IP from settings.yaml: {}", config.host.ip);
+            logd!(2, "Using host IP from settings.yaml: {}", config.host.ip);
             Ok(config.host.ip.clone())
         } else {
             Err(format!("No IP found for node '{}'", node_name).into())
@@ -124,7 +129,7 @@ impl ActionControllerManager {
     fn get_fallback_node_role(&self, node_name: &str) -> Result<String> {
         let config = common::setting::get_config();
         if config.host.name == node_name {
-            println!("Using role from settings.yaml for node '{}'", node_name);
+            logd!(2, "Using role from settings.yaml for node '{}'", node_name);
             Ok(NODE_TYPE_NODEAGENT.to_string())
         } else {
             Err(format!("No details found for node '{}'", node_name).into())
@@ -146,13 +151,16 @@ impl ActionControllerManager {
                     node_roles.insert(model_node.clone(), role);
                 }
                 Err(e) => {
-                    println!(
+                    logd!(
+                        4,
                         "Warning: Failed to get role for node '{}' from etcd: {}",
-                        model_node, e
+                        model_node,
+                        e
                     );
                     if self.nodeagent_nodes.contains(&model_node) {
                         node_roles.insert(model_node.clone(), NODE_TYPE_NODEAGENT.to_string());
-                        println!(
+                        logd!(
+                            2,
                             "Node {} found in nodeagent_nodes from cached list",
                             model_node
                         );
@@ -283,22 +291,24 @@ impl ActionControllerManager {
             source: "actioncontroller".to_string(),
         };
 
-        println!("🔄 SCENARIO STATE TRANSITION: ActionController Completion");
-        println!("   📋 Scenario: {}", scenario_name);
-        println!("   🔄 State Change: {} → {}", current, target);
-        println!("   📤 Sending StateChange to StateManager");
-
         if let Err(e) = self
             .state_sender
             .clone()
             .send_state_change(state_change)
             .await
         {
-            println!("   ❌ Failed to send state change to StateManager: {:?}", e);
+            logd!(
+                5,
+                "  ❌ Failed to send state change to StateManager: {:?}",
+                e
+            );
         } else {
-            println!(
-                "   ✅ Successfully notified StateManager: scenario {} {} → {}",
-                scenario_name, current, target
+            logd!(
+                3,
+                "  ✅ Successfully notified StateManager: scenario {}, {} → {}",
+                scenario_name,
+                current,
+                target
             );
         }
     }
@@ -350,7 +360,7 @@ impl ActionControllerManager {
     /// - The scenario is not allowed by policy
     /// - The runtime operation fails
     pub async fn trigger_manager_action(&self, scenario_name: &str) -> Result<()> {
-        println!("trigger_manager_action in manager {:?}", scenario_name);
+        logd!(2, "trigger_manager_action in manager {:?}", scenario_name);
 
         if scenario_name.trim().is_empty() {
             return Err(format!("Scenario '{}' is invalid: cannot be empty", scenario_name).into());
@@ -367,21 +377,21 @@ impl ActionControllerManager {
 
             let node_type = match node_roles.get(&model_node) {
                 Some(role) => {
-                    println!("Using node {} as {}", model_node, role);
+                    logd!(2, "Using node {} as {}", model_node, role);
                     role.as_str()
                 }
                 None => {
-                    println!(
-                        "Warning: Node '{}' is not configured or cannot determine its role. Skipping deployment.",
-                        model_node
-                    );
+                    logd!(4, "Warning: Node '{}' is not configured or cannot determine its role. Skipping deployment.", model_node);
                     continue;
                 }
             };
 
-            println!(
+            logd!(
+                2,
                 "Processing model '{}' on node '{}' with action '{}'",
-                model_name, model_node, action
+                model_name,
+                model_node,
+                action
             );
 
             self.execute_model_action(
@@ -469,7 +479,8 @@ impl ActionControllerManager {
                 "nodeagent"
             } else {
                 // Log warning for unknown node types and skip processing
-                println!(
+                logd!(
+                    4,
                     "Warning: Node '{}' is not explicitly configured. Skipping deployment.",
                     model_node
                 );

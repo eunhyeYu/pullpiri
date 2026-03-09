@@ -16,7 +16,7 @@ impl FaultService for TimpaniReceiver {
         info: Request<FaultInfo>,
     ) -> Result<Response<TimpaniResponse>, Status> {
         let info = info.into_inner();
-        println!("Received fault notification: {:?}", info);
+        common::logd!(4, "Received fault notification: {:?}", info);
 
         // Process the fault information and generate a response
         let response = TimpaniResponse { status: 0 };

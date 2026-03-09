@@ -5,25 +5,26 @@
 
 //! Diagnostic utilities for service connectivity
 
+use common::logd;
 use std::time::Duration;
 use tokio::net::TcpStream;
 
 /// Check if a service is reachable at the given IP and port
 pub async fn check_service_connectivity(ip: &str, port: u16) -> bool {
     let addr = format!("{}:{}", ip, port);
-    println!("Checking connectivity to {}", addr);
+    logd!(2, "Checking connectivity to {}", addr);
 
     match tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(&addr)).await {
         Ok(Ok(_)) => {
-            println!("Successfully connected to {}", addr);
+            logd!(2, "Successfully connected to {}", addr);
             true
         }
         Ok(Err(e)) => {
-            println!("Failed to connect to {}: {}", addr, e);
+            logd!(4, "Failed to connect to {}: {}", addr, e);
             false
         }
         Err(_) => {
-            println!("Connection timeout to {}", addr);
+            logd!(4, "Connection timeout to {}", addr);
             false
         }
     }
@@ -93,7 +94,7 @@ mod tests {
         let result2 = check_service_connectivity("localhost", port).await;
         // Note: This might fail in some test environments, so we just test it doesn't panic
         // In a real environment, localhost should resolve to 127.0.0.1
-        println!("Localhost connection result: {}", result2);
+        logd!(2, "Localhost connection result: {}", result2);
     }
 
     #[tokio::test]
@@ -144,7 +145,7 @@ mod tests {
         let result = check_node_agent_connectivity("127.0.0.1").await;
         // We don't assert the result since no actual NodeAgent is running
         // but we verify the function executes without panic
-        println!("NodeAgent connectivity test result: {}", result);
+        logd!(2, "NodeAgent connectivity test result: {}", result);
     }
 
     #[tokio::test]
@@ -159,7 +160,8 @@ mod tests {
                 // Port 47004 might be in use, test with unavailable service
                 let result = check_node_agent_connectivity("127.0.0.1").await;
                 // Just verify it doesn't panic - result depends on what's running on 47004
-                println!(
+                logd!(
+                    2,
                     "NodeAgent connectivity result (port might be in use): {}",
                     result
                 );
@@ -240,7 +242,7 @@ mod tests {
         // Test with IPv6 localhost address
         let result = check_service_connectivity("::1", 8080).await;
         // This may fail in environments without IPv6 support, so we just ensure no panic
-        println!("IPv6 localhost connectivity result: {}", result);
+        logd!(2, "IPv6 localhost connectivity result: {}", result);
     }
 
     #[tokio::test]
@@ -257,7 +259,7 @@ mod tests {
             let result = check_service_connectivity(ip, port).await;
             // We don't assert specific results as they depend on network configuration
             // but ensure no panics occur
-            println!("Connectivity test for {}:{} = {}", ip, port, result);
+            logd!(2, "Connectivity test for {}:{} = {}", ip, port, result);
         }
     }
 }

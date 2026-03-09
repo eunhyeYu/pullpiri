@@ -5,8 +5,8 @@
 pub mod receiver;
 pub mod sender;
 
+use common::logd;
 use std::sync::Arc;
-
 use tonic::transport::Server;
 
 /// Initialize the gRPC communication system for ActionController
@@ -29,7 +29,7 @@ pub async fn init(manager: crate::manager::ActionControllerManager) -> common::R
     let grpc_server = receiver::ActionControllerReceiver::new(arc_manager.clone());
 
     let addr = common::actioncontroller::open_server().parse()?;
-    println!("Starting gRPC server on {}", addr);
+    logd!(1, "Starting gRPC server on {}", addr);
 
     tokio::spawn(async move {
         if let Err(e) = Server::builder()
@@ -37,11 +37,11 @@ pub async fn init(manager: crate::manager::ActionControllerManager) -> common::R
             .serve(addr)
             .await
         {
-            eprintln!("gRPC server error: {}", e);
+            logd!(5, "gRPC server error: {}", e);
         }
     });
 
-    println!("gRPC server started and listening");
+    logd!(1, "gRPC server started and listening");
 
     Ok(())
 }
@@ -56,7 +56,6 @@ mod tests {
     #[tokio::test]
     async fn test_open_server_returns_valid_address() {
         let addr = common::actioncontroller::open_server();
-        println!("open_server() returned: {}", addr);
 
         // Just check it contains ":" (host:port format)
         assert!(addr.contains(':'), "Address should be in host:port format");
@@ -65,7 +64,6 @@ mod tests {
     #[tokio::test]
     async fn test_connect_server_returns_valid_url() {
         let url = common::actioncontroller::connect_server();
-        println!("connect_server() returned: {}", url);
 
         // Should start with http:// and contain ":"
         assert!(url.starts_with("http://"));

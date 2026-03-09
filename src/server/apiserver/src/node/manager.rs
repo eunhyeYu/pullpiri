@@ -7,6 +7,7 @@
 
 use common::apiserver::NodeInfo;
 use common::etcd;
+use common::logd;
 use common::nodeagent::fromapiserver::{NodeRegistrationRequest, NodeStatus};
 
 /// Node manager for handling cluster node operations
@@ -53,7 +54,7 @@ impl NodeManager {
         let hostname_key = format!("nodes/{}", request.hostname);
         etcd::put(&hostname_key, &request.ip_address).await?;
 
-        println!("Node {} registered successfully", request.node_id);
+        logd!(2, "Node {} registered successfully", request.node_id);
         Ok(format!("cluster-token-{}", request.node_id))
     }
 
@@ -69,7 +70,7 @@ impl NodeManager {
             match serde_json::from_str::<NodeInfo>(&kv.1) {
                 Ok(node) => nodes.push(node),
                 Err(e) => {
-                    eprintln!("Failed to parse node json for key {}: {}", kv.0, e);
+                    logd!(5, "Failed to parse node json for key {}: {}", kv.0, e);
                     continue;
                 }
             }
@@ -115,7 +116,7 @@ impl NodeManager {
             let node_json = serde_json::to_string(&node)?;
             etcd::put(&node_key, &node_json).await?;
 
-            println!("Updated heartbeat for node {}", node_id);
+            logd!(1, "Updated heartbeat for node {}", node_id);
         }
         Ok(())
     }
@@ -135,7 +136,7 @@ impl NodeManager {
             let node_json = serde_json::to_string(&node)?;
             etcd::put(&node_key, &node_json).await?;
 
-            println!("Updated status for node {} to {:?}", node_id, status);
+            logd!(1, "Updated status for node {} to {:?}", node_id, status);
         }
         Ok(())
     }
@@ -150,7 +151,7 @@ impl NodeManager {
             let node_key = format!("cluster/nodes/{}", node.hostname);
             etcd::delete(&node_key).await?;
 
-            println!("Removed node {} from cluster", node_id);
+            logd!(2, "Removed node {} from cluster", node_id);
             return Ok(());
         }
 
@@ -299,7 +300,7 @@ mod tests {
             }
             Err(e) => {
                 // Expected if etcd is not available during testing
-                println!("Expected etcd connection error: {}", e);
+                logd!(4, "Expected etcd connection error: {}", e);
             }
         }
     }
@@ -322,9 +323,11 @@ mod tests {
                     assert!(token.contains(&request.node_id));
                 }
                 Err(e) => {
-                    println!(
+                    logd!(
+                        4,
                         "Expected etcd connection error for {}: {}",
-                        request.node_id, e
+                        request.node_id,
+                        e
                     );
                 }
             }
@@ -338,11 +341,11 @@ mod tests {
         match manager.get_all_nodes().await {
             Ok(nodes) => {
                 // If etcd is available, we should get a vector (possibly empty)
-                println!("Retrieved {} nodes", nodes.len());
+                logd!(2, "Retrieved {} nodes", nodes.len());
             }
             Err(e) => {
                 // Expected if etcd is not available
-                println!("Expected etcd connection error: {}", e);
+                logd!(4, "Expected etcd connection error: {}", e);
             }
         }
     }
@@ -358,20 +361,25 @@ mod tests {
         match (&result1, &result2) {
             (Ok(nodes1), Ok(nodes2)) => {
                 assert_eq!(nodes1.len(), nodes2.len());
-                println!("Both methods returned {} nodes", nodes1.len());
+                logd!(2, "Both methods returned {} nodes", nodes1.len());
             }
             (Err(e1), Err(e2)) => {
                 // Both should fail with same error if etcd unavailable
-                println!(
+                logd!(
+                    4,
                     "Both methods failed as expected when etcd unavailable: {} / {}",
-                    e1, e2
+                    e1,
+                    e2
                 );
             }
             _ => {
                 // This shouldn't happen - both should behave identically
-                println!("get_nodes and get_all_nodes returned different result types");
-                println!("Result1: {:?}", result1.is_ok());
-                println!("Result2: {:?}", result2.is_ok());
+                logd!(
+                    6,
+                    "get_nodes and get_all_nodes returned different result types"
+                );
+                logd!(6, "Result1: {:?}", result1.is_ok());
+                logd!(6, "Result2: {:?}", result2.is_ok());
                 // Don't panic, just log the discrepancy for debugging
             }
         }
@@ -384,13 +392,13 @@ mod tests {
         match manager.get_node("test-node-001").await {
             Ok(Some(node)) => {
                 assert_eq!(node.node_id, "test-node-001");
-                println!("Found node: {}", node.hostname);
+                logd!(2, "Found node: {}", node.hostname);
             }
             Ok(None) => {
-                println!("Node not found (expected if not previously registered)");
+                logd!(5, "Node not found (expected if not previously registered)");
             }
             Err(e) => {
-                println!("Expected etcd connection error: {}", e);
+                logd!(4, "Expected etcd connection error: {}", e);
             }
         }
     }

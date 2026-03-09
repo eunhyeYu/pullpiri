@@ -7,6 +7,7 @@
 use crate::node::node_lookup::{find_guest_nodes, find_node_by_hostname, get_node_ip};
 use common::apiserver::api_server_connection_server::ApiServerConnectionServer;
 use common::filtergateway::{Action, HandleScenarioRequest};
+use common::logd;
 use common::nodeagent::fromapiserver::HandleYamlRequest;
 use tonic::transport::Server;
 
@@ -14,9 +15,9 @@ use tonic::transport::Server;
 pub async fn initialize() {
     // 먼저 호스트 노드를 etcd에 등록합니다.
     if let Err(e) = register_host_node().await {
-        eprintln!("Failed to register host node: {:?}", e);
+        logd!(5, "Failed to register host node: {:?}", e);
     } else {
-        println!("Host node registered successfully");
+        logd!(2, "Host node registered successfully");
     }
 
     tokio::join!(
@@ -34,7 +35,7 @@ async fn start_grpc_server() {
 
     let grpc_service = crate::grpc::receiver::ApiServerReceiver::new();
 
-    println!("ApiServer gRPC listening on {}", addr);
+    logd!(3, "ApiServer gRPC listening on {}", addr);
 
     let _ = Server::builder()
         .add_service(ApiServerConnectionServer::new(grpc_service))
@@ -96,9 +97,11 @@ async fn register_host_node() -> Result<(), Box<dyn std::error::Error + Send + S
     let hostname_key = format!("nodes/{}", hostname);
     common::etcd::put(&hostname_key, &ip_address).await?;
 
-    println!(
+    logd!(
+        2,
         "Host node information registered to etcd: {} ({})",
-        hostname, ip_address
+        hostname,
+        ip_address
     );
     Ok(())
 }
@@ -119,17 +122,17 @@ async fn reload() {
                 scenario,
             };
             if let Err(status) = crate::grpc::sender::filtergateway::send(req).await {
-                println!("{:#?}", status);
+                logd!(4, "{:#?}", status);
             }
         }
     } else {
-        println!("{:#?}", scenarios_result);
+        logd!(2, "{:#?}", scenarios_result);
     }
 }
 
 /// Apply downloaded artifact
 ///
-/// ### Parametets
+/// ### Parameters
 /// * `body: &str` - whole yaml string of piccolo artifact
 /// ### Description
 /// write artifact in etcd
@@ -137,114 +140,6 @@ async fn reload() {
 /// send a gRPC message to gateway
 pub async fn apply_artifact(body: &str) -> common::Result<()> {
     let scenario = crate::artifact::apply(body).await?;
-
-    /*let handle_yaml = HandleYamlRequest {
-        yaml: body.to_string(),
-    };
-
-    // 패키지에서 노드 정보를 추출
-    let mut target_node = None;
-
-    // YAML 문서에서 Package 종류 찾아서 노드 정보 추출
-    let docs: Vec<&str> = body.split("---").collect();
-    for doc in docs {
-        if doc.trim().is_empty() {
-            continue;
-        }
-
-        match serde_yaml::from_str::<serde_yaml::Value>(doc) {
-            Ok(value) => {
-                if let Some(kind) = value.get("kind").and_then(|k| k.as_str()) {
-                    if kind == "Package" {
-                        if let Ok(package) =
-                            serde_yaml::from_value::<common::spec::artifact::Package>(value.clone())
-                        {
-                            for model in package.get_models() {
-                                let node_name = model.get_node();
-                                if !node_name.is_empty() {
-                                    println!("Found node in package: {}", node_name);
-                                    if let Some(node_info) = find_node_by_hostname(&node_name).await
-                                    {
-                                        println!(
-                                            "Found node info for {}: IP={}",
-                                            node_name, node_info.ip_address
-                                        );
-                                        target_node = Some(node_info.ip_address);
-                                        break;
-                                    }
-                                }
-                            }
-                            if target_node.is_some() {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            Err(_) => continue, // Skip invalid YAML
-        }
-    }
-
-    // 노드를 찾지 못했으면 기본 노드 IP 사용
-    let node_ip = if let Some(ip) = target_node {
-        ip
-    } else {
-        println!("No target nodes found in package or nodes not registered, using default node");
-        get_node_ip().await
-    };
-
-    println!("apply_artifact: Using node IP: {}", node_ip);
-
-    // Log a warning if using 0.0.0.0 - this is likely a problem
-    if node_ip == "0.0.0.0" {
-        eprintln!("Warning: Using IP 0.0.0.0 which may not be accessible from NodeAgent.");
-        eprintln!(
-            "NodeAgent transport errors are likely. Consider using a specific IP in settings.yaml"
-        );
-    }
-
-    // Try to send to the node
-    match crate::grpc::sender::nodeagent::send_to_node(handle_yaml.clone(), node_ip.clone()).await {
-        Ok(_) => println!("Successfully sent yaml to NodeAgent"),
-        Err(e) => {
-            eprintln!("Error sending yaml to NodeAgent: {:?}", e);
-            return Err(Box::new(std::io::Error::other(format!(
-                "NodeAgent connection error: {:?}",
-                e
-            ))));
-        }
-    };
-
-    // etcd에서 게스트 노드들의 정보를 가져와 yaml 전송
-    let guest_nodes = find_guest_nodes().await;
-    if guest_nodes.is_empty() {
-        println!("No guest nodes found in etcd, skipping guest node deployment");
-    } else {
-        for guest_node in guest_nodes {
-            if guest_node.ip_address != node_ip {
-                // 이미 전송한 노드와 다른 경우에만 전송
-                println!(
-                    "Attempting to send yaml to guest node {} at {}",
-                    guest_node.node_id, guest_node.ip_address
-                );
-                match crate::grpc::sender::nodeagent::send_to_node(
-                    handle_yaml.clone(),
-                    guest_node.ip_address,
-                )
-                .await
-                {
-                    Ok(_) => println!(
-                        "Successfully sent yaml to guest NodeAgent {}",
-                        guest_node.node_id
-                    ),
-                    Err(e) => println!(
-                        "Error sending yaml to guest NodeAgent {}: {:?}",
-                        guest_node.node_id, e
-                    ),
-                }
-            }
-        }
-    }*/
 
     let req: HandleScenarioRequest = HandleScenarioRequest {
         action: Action::Apply.into(),
@@ -256,7 +151,7 @@ pub async fn apply_artifact(body: &str) -> common::Result<()> {
 
 /// Withdraw downloaded artifact
 ///
-/// ### Parametets
+/// ### Parameters
 /// * `body: &str` - whole yaml string of piccolo artifact
 /// ### Description
 /// delete artifact in etcd
@@ -819,11 +714,11 @@ spec:
                     scenario,
                 };
                 if let Err(status) = mock_send(req, grpc_addr).await {
-                    println!("{:#?}", status);
+                    logd!(5, "{:#?}", status);
                 }
             }
         } else {
-            println!("{:#?}", scenarios_result);
+            logd!(3, "{:#?}", scenarios_result);
         }
     }
 
@@ -910,7 +805,7 @@ spec:
 
         let result = apply_artifact(INVALID_ARTIFACT_YAML_EMPTY, addr).await;
         if let Err(e) = &result {
-            println!("apply_artifact() failed with error: {:?}", e);
+            logd!(5, "apply_artifact() failed with error: {:?}", e);
         }
         assert!(
             result.is_err(),
@@ -925,7 +820,7 @@ spec:
 
         let result = apply_artifact(INVALID_ARTIFACT_YAML_UNKNOWN, addr).await;
         if let Err(e) = &result {
-            println!("apply_artifact() failed with error: {:?}", e);
+            logd!(5, "apply_artifact() failed with error: {:?}", e);
         }
         assert!(
             result.is_err(),

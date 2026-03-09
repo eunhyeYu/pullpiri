@@ -3,8 +3,8 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 use anyhow::anyhow;
+use common::logd;
 use common::Result;
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
@@ -53,7 +53,7 @@ impl DdsManager {
     }
     /// Scan and process IDL directory at runtime
     pub async fn scan_idl_directory(&mut self, dir: &Path) -> Result<Vec<String>> {
-        info!("Scanning IDL directory at runtime: {:?}", dir);
+        logd!(3, "Scanning IDL directory at runtime: {:?}", dir);
         let mut found_types = Vec::new();
 
         // Check if directory exists
@@ -74,7 +74,7 @@ impl DdsManager {
             }
         }
 
-        info!("Found {} IDL types at runtime", found_types.len());
+        logd!(3, "Found {} IDL types at runtime", found_types.len());
         Ok(found_types)
     }
     /// 타입명에 맞는 특화된 리스너 생성
@@ -85,10 +85,11 @@ impl DdsManager {
     ) -> Result<()> {
         // 이미 존재하는 리스너인지 확인
         if self.listeners.contains_key(&topic_name) {
-            warn!("Listener for topic '{}' already exists", topic_name);
+            logd!(4, "Listener for topic '{}' already exists", topic_name);
             return Ok(());
         }
-        print!(
+        logd!(
+            2,
             "DDSManager - Creating typed listener for topic '{}'",
             topic_name
         );
@@ -106,9 +107,11 @@ impl DdsManager {
                 .await
                 .map_err(|e| anyhow!("Failed to start typed listener: {:?}", e))?;
 
-            println!(
+            logd!(
+                2,
                 "Started typed listener for {} with specific type {}",
-                topic_name, data_type_name
+                topic_name,
+                data_type_name
             );
 
             // 리스너 맵에 추가
@@ -117,7 +120,8 @@ impl DdsManager {
         }
 
         // Create generic listener if no type-specific listener is found
-        warn!(
+        logd!(
+            4,
             "No specific type handler for '{}', using generic listener",
             data_type_name
         );
@@ -194,7 +198,7 @@ impl DdsManager {
     pub async fn stop_all(&mut self) -> Result<()> {
         for (_, mut listener) in std::mem::take(&mut self.listeners) {
             if let Err(e) = listener.stop().await {
-                eprintln!("Failed to stop listener: {:?}", e);
+                logd!(5, "Failed to stop listener: {:?}", e);
             }
         }
 
@@ -211,7 +215,7 @@ impl DdsManager {
         &mut self,
         settings_path: P,
     ) -> Result<()> {
-        info!("Initializing DDS Manager");
+        logd!(3, "Initializing DDS Manager");
         let default_domain_id = 0;
 
         let settings_path = settings_path.into().unwrap_or_else(|| {
@@ -220,7 +224,7 @@ impl DdsManager {
                 .unwrap_or_else(|_| PathBuf::from("/etc/piccolo/settings.yaml"))
         });
 
-        info!("Reading settings from {:?}", settings_path);
+        logd!(3, "Reading settings from {:?}", settings_path);
         let content = fs::read_to_string(&settings_path)?;
 
         // JSON 또는 YAML 파싱
@@ -233,7 +237,7 @@ impl DdsManager {
             .map(|id| id as i32)
             .unwrap_or(default_domain_id);
 
-        info!("Domain ID from settings: {}", domain_id);
+        logd!(3, "Domain ID from settings: {}", domain_id);
 
         // Check OUT_DIR value (not used at runtime, only for logging)
         if let Some(out_dir) = settings
@@ -241,7 +245,7 @@ impl DdsManager {
             .and_then(|dds| dds.get("out_dir"))
             .and_then(|path| path.as_str())
         {
-            info!("Output directory from settings: {}", out_dir);
+            logd!(3, "Output directory from settings: {}", out_dir);
         }
 
         self.domain_id = domain_id;
@@ -303,7 +307,8 @@ pub mod dds_type_registry {
         tx: Sender<DdsData>,
         domain_id: i32,
     ) -> Option<Box<dyn DdsTopicListener>> {
-        log::info!(
+        logd!(
+            3,
             "No type registry found. Looking for type handler: {}",
             type_name
         );

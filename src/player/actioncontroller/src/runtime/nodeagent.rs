@@ -2,9 +2,9 @@
 * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
 * SPDX-License-Identifier: Apache-2.0
 */
+use common::logd;
 use common::nodeagent::fromactioncontroller::{HandleWorkloadRequest, WorkloadCommand};
 use common::Result;
-
 /// Runtime implementation for NodeAgent API interactions
 ///
 /// Handles workload operations for nodes managed by NodeAgent,
@@ -19,7 +19,7 @@ pub async fn create_workload(pod: &str, node_name: &str) -> Result<()> {
 
 pub async fn handle_workload(cmd: WorkloadCommand, pod: &str, node_name: &str) -> Result<()> {
     if let Some(addr) = get_node_name_from_hostname(node_name).await {
-        println!("node_name: {}, addr: {}", node_name, addr);
+        logd!(2, "node_name: {}, addr: {}", node_name, addr);
 
         let request = HandleWorkloadRequest {
             workload_command: cmd.into(),
@@ -27,7 +27,7 @@ pub async fn handle_workload(cmd: WorkloadCommand, pod: &str, node_name: &str) -
         };
         crate::grpc::sender::nodeagent::send_workload_handle_request(&addr, request).await?;
     } else {
-        println!("Node {} not found in DB", node_name);
+        logd!(2, "Node {} not found in DB", node_name);
         return Err(format!("Node {} not found in DB", node_name).into());
     }
 
@@ -54,14 +54,14 @@ pub async fn restart_workload(pod: &str, node_name: &str) -> Result<()> {
 
 /// Find a node by IP address from simplified node keys
 async fn get_node_name_from_hostname(hostname: &str) -> Option<String> {
-    println!("Checking node keys in etcd...");
+    logd!(2, "Checking node keys in etcd...");
     match common::etcd::get(&format!("nodes/{}", hostname)).await {
         Ok(ip) => {
-            println!("Found node IP: {}", ip);
+            logd!(2, "Found node IP: {}", ip);
             Some(ip)
         }
         Err(e) => {
-            println!("Error checking nodes: {}", e);
+            logd!(5, "Error checking nodes: {}", e);
             None
         }
     }

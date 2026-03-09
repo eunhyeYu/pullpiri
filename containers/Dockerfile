@@ -75,12 +75,13 @@ COPY --from=builder /piccolo/target/release/apiserver /piccolo/
 COPY --from=builder /piccolo/target/release/monitoringserver /piccolo/
 COPY --from=builder /piccolo/target/release/policymanager /piccolo/
 COPY --from=builder /piccolo/target/release/settingsservice /piccolo/
+COPY --from=builder /piccolo/target/release/logservice /piccolo/
 #COPY --from=builder /piccolo/target/release/nodeagent /piccolo/
 COPY --from=builder /piccolo/target/release/actioncontroller /piccolo/
 COPY --from=builder /piccolo/target/release/filtergateway /piccolo/
 COPY --from=builder /piccolo/target/release/statemanager /piccolo/
 
 # Copy runtime settings
-COPY ./src/settings.yaml .
+# COPY ./src/settings.yaml .
 
 CMD [ "sh" ]
