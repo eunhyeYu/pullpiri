@@ -134,12 +134,14 @@ mod tests {
 
         let app = Router::new()
             .route("/api/notify", get(|| async { StatusCode::OK }))
+            .route("/api/health", get(|| async { StatusCode::OK }))
             .route("/api/artifact", post(|| async { StatusCode::OK }))
             .route("/api/artifact", delete(|| async { StatusCode::OK }))
             .layer(cors);
 
         let test_cases = [
             ("GET", "/api/notify", StatusCode::OK),
+            ("GET", "/api/health", StatusCode::OK),
             ("POST", "/api/artifact", StatusCode::OK),
             ("DELETE", "/api/artifact", StatusCode::OK),
         ];
