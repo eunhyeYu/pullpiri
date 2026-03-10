@@ -73,7 +73,7 @@ async fn apply_yaml(client: &SettingsClient, file_path: &str) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to apply YAML artifact: {}", e));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
@@ -123,7 +123,7 @@ async fn withdraw_yaml(client: &SettingsClient, file_path: &str) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to withdraw YAML artifact: {}", e));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
@@ -139,7 +139,10 @@ fn read_yaml_content(file_path: &str) -> Result<String> {
         Ok(buffer)
     } else {
         if !Path::new(file_path).exists() {
-            return Err(crate::CliError::Custom(format!("File not found: {}", file_path)).into());
+            return Err(crate::CliError::Custom(format!(
+                "File not found: {}",
+                file_path
+            )));
         }
         let content = fs::read_to_string(file_path)?;
         Ok(content)
@@ -177,7 +180,7 @@ fn validate_yaml_artifact(yaml_content: &str) -> Result<()> {
     }
 
     // Warn about missing kinds but don't fail
-    let required_kinds = vec!["Scenario", "Package", "Model"];
+    let required_kinds = ["Scenario", "Package", "Model"];
     let missing_kinds: Vec<&str> = required_kinds
         .iter()
         .filter(|&&kind| !found_kinds.contains(kind))

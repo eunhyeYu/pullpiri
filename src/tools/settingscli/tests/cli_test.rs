@@ -1,7 +1,7 @@
 /*
-* SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
-* SPDX-License-Identifier: Apache-2.0
-*/
+ * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 //! CLI-specific tests
 
 // Note: These are basic unit tests for the CLI components
@@ -60,6 +60,28 @@ fn test_dual_client_creation() {
     assert!(api_client.is_ok(), "API Server client creation failed");
 }
 
+/// Test that dual clients can be created using environment-variable-style URLs
+#[test]
+fn test_dual_client_creation_with_custom_host() {
+    use settingscli::SettingsClient;
+
+    let base_url = "http://10.231.178.2";
+    let settings_url = format!("{}:{}", base_url, 8080);
+    let api_url = format!("{}:{}", base_url, 47099);
+
+    let settings_client = SettingsClient::new(&settings_url, 30);
+    let api_client = SettingsClient::new(&api_url, 30);
+
+    assert!(
+        settings_client.is_ok(),
+        "SettingsService client creation with custom host failed"
+    );
+    assert!(
+        api_client.is_ok(),
+        "API Server client creation with custom host failed"
+    );
+}
+
 /// Test API health check with unreachable service returns false (not error)
 #[tokio::test]
 async fn test_api_health_check_with_unreachable_service() {
@@ -75,6 +97,53 @@ async fn test_api_health_check_with_unreachable_service() {
         Err(_) => {}    // Also acceptable
         Ok(true) => panic!("API health check should not succeed for unreachable service"),
     }
+}
+
+/// Test settings health check with unreachable service returns false (not error)
+#[tokio::test]
+async fn test_settings_health_check_with_unreachable_service() {
+    use settingscli::SettingsClient;
+
+    let client = SettingsClient::new("http://localhost:59997", 1).unwrap();
+    let result = client.health_check().await;
+
+    match result {
+        Ok(false) => {} // Expected: service unreachable
+        Err(_) => {}    // Also acceptable
+        Ok(true) => panic!("Settings health check should not succeed for unreachable service"),
+    }
+}
+
+/// Test that post_yaml to unreachable API server returns an error (not success)
+#[tokio::test]
+async fn test_post_yaml_to_unreachable_api_server() {
+    use settingscli::SettingsClient;
+
+    let api_client = SettingsClient::new("http://localhost:59996", 1).unwrap();
+    let result = api_client
+        .post_yaml("/api/artifact", "kind: Scenario\nmetadata:\n  name: test")
+        .await;
+
+    assert!(
+        result.is_err(),
+        "post_yaml should fail when API Server is unreachable"
+    );
+}
+
+/// Test that delete_yaml to unreachable API server returns an error (not success)
+#[tokio::test]
+async fn test_delete_yaml_to_unreachable_api_server() {
+    use settingscli::SettingsClient;
+
+    let api_client = SettingsClient::new("http://localhost:59995", 1).unwrap();
+    let result = api_client
+        .delete_yaml("/api/artifact", "kind: Scenario\nmetadata:\n  name: test")
+        .await;
+
+    assert!(
+        result.is_err(),
+        "delete_yaml should fail when API Server is unreachable"
+    );
 }
 
 // Note: More comprehensive CLI argument parsing tests would require

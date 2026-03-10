@@ -106,7 +106,7 @@ async fn list_containers(client: &SettingsClient) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to fetch containers: {}", e));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
@@ -201,7 +201,7 @@ async fn get_container(client: &SettingsClient, container_id: &str) -> Result<()
                 "Failed to fetch container {}: {}",
                 container_id, e
             ));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
@@ -219,7 +219,7 @@ async fn raw_containers(client: &SettingsClient) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to fetch raw containers data: {}", e));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
