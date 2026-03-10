@@ -139,7 +139,10 @@ fn read_yaml_content(file_path: &str) -> Result<String> {
         Ok(buffer)
     } else {
         if !Path::new(file_path).exists() {
-            return Err(crate::CliError::Custom(format!("File not found: {}", file_path)));
+            return Err(crate::CliError::Custom(format!(
+                "File not found: {}",
+                file_path
+            )));
         }
         let content = fs::read_to_string(file_path)?;
         Ok(content)
