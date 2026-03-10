@@ -65,7 +65,8 @@ fn test_dual_client_creation() {
 fn test_dual_client_independence() {
     use settingscli::SettingsClient;
 
-    let base_url = "http://10.231.178.2";
+    // Use 192.0.2.1 (TEST-NET-1, RFC 5737) as a clearly non-routable test address
+    let base_url = "http://192.0.2.1";
     let settings_url = format!("{}:{}", base_url, 8080);
     let api_url = format!("{}:{}", base_url, 47099);
 
