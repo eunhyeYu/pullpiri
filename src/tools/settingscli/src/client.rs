@@ -125,10 +125,11 @@ impl SettingsClient {
         self.check_health_endpoint("/api/health").await
     }
 
-    /// Internal helper: check a single health endpoint
+    /// Internal helper: check a single health endpoint (only verifies HTTP status, not response body)
     async fn check_health_endpoint(&self, endpoint: &str) -> Result<bool> {
-        match self.get(endpoint).await {
-            Ok(_) => Ok(true),
+        let url = format!("{}{}", self.base_url, endpoint);
+        match self.client.get(&url).send().await {
+            Ok(response) => Ok(response.status().is_success()),
             Err(_) => Ok(false),
         }
     }

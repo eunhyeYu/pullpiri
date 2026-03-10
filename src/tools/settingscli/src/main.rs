@@ -75,7 +75,7 @@ enum Commands {
         #[command(subcommand)]
         action: yaml::YamlAction,
     },
-    /// Test connection to SettingsService
+    /// Test connection to SettingsService and API Server
     Health,
 }
 
