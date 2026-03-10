@@ -48,7 +48,12 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
+        let bytes = response.bytes().await?;
+        let json = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes)?
+        };
         Ok(json)
     }
 
@@ -125,11 +130,10 @@ impl SettingsClient {
         self.check_health_endpoint("/api/health").await
     }
 
-    /// Internal helper: check a single health endpoint (only verifies HTTP status, not response body)
+    /// Internal helper: check a single health endpoint
     async fn check_health_endpoint(&self, endpoint: &str) -> Result<bool> {
-        let url = format!("{}{}", self.base_url, endpoint);
-        match self.client.get(&url).send().await {
-            Ok(response) => Ok(response.status().is_success()),
+        match self.get(endpoint).await {
+            Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
     }
