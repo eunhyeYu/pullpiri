@@ -1,7 +1,7 @@
 /*
-* SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
-* SPDX-License-Identifier: Apache-2.0
-*/
+ * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 //! REST API client for SettingsService
 
 use crate::error::{CliError, Result};
@@ -117,20 +117,18 @@ impl SettingsClient {
     }
 
     /// Check if the SettingsService is reachable
+    ///
+    /// Tries `/api/v1/health` endpoint as specified in the health check rules.
     pub async fn health_check(&self) -> Result<bool> {
-        match self.get("/api/v1/system/health").await {
+        match self.get("/api/v1/health").await {
             Ok(_) => Ok(true),
-            Err(_) => {
-                // Try alternative health check endpoint
-                match self.get("/api/v1/health").await {
-                    Ok(_) => Ok(true),
-                    Err(_) => Ok(false),
-                }
-            }
+            Err(_) => Ok(false),
         }
     }
 
     /// Check if the API Server is reachable
+    ///
+    /// Checks `/api/health` endpoint as specified in the health check rules.
     pub async fn api_health_check(&self) -> Result<bool> {
         match self.get("/api/health").await {
             Ok(_) => Ok(true),
@@ -141,7 +139,7 @@ impl SettingsClient {
     /// Apply YAML artifact (POST with text/plain content)
     ///
     /// # Arguments
-    /// * `endpoint` - API endpoint (e.g., "/api/v1/yaml")
+    /// * `endpoint` - API endpoint (e.g., "/api/artifact")
     /// * `yaml_content` - YAML content as string
     pub async fn post_yaml(&self, endpoint: &str, yaml_content: &str) -> Result<Value> {
         let url = format!("{}{}", self.base_url, endpoint);
@@ -172,7 +170,7 @@ impl SettingsClient {
     /// Withdraw YAML artifact (DELETE with text/plain content)
     ///
     /// # Arguments
-    /// * `endpoint` - API endpoint (e.g., "/api/v1/yaml")
+    /// * `endpoint` - API endpoint (e.g., "/api/artifact")
     /// * `yaml_content` - YAML content as string
     pub async fn delete_yaml(&self, endpoint: &str, yaml_content: &str) -> Result<Value> {
         let url = format!("{}{}", self.base_url, endpoint);

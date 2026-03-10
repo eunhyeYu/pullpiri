@@ -1,11 +1,12 @@
 /*
-* SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
-* SPDX-License-Identifier: Apache-2.0
-*/
-//! CLI-specific tests
-
-// Note: These are basic unit tests for the CLI components
-// Full CLI testing would require more sophisticated mocking
+ * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+//! CLI routing tests
+//!
+//! These tests verify the dual-client routing behavior:
+//! - YAML commands use the API Server client (port 47099)
+//! - Other commands use the SettingsService client (port 8080)
 
 #[test]
 fn test_error_display() {
@@ -23,29 +24,37 @@ fn test_client_creation() {
     assert!(client.is_ok());
 }
 
-/// Test that a settings client can be created with port 8080
+/// Verify that a SettingsService client can be created with the default port (8080)
 #[test]
-fn test_settings_client_creation_port_8080() {
+fn test_settings_client_default_port() {
     use settingscli::SettingsClient;
 
     let client = SettingsClient::new("http://localhost:8080", 30);
-    assert!(client.is_ok());
+    assert!(
+        client.is_ok(),
+        "SettingsService client (port 8080) creation must succeed"
+    );
 }
 
-/// Test that an API server client can be created with port 47099
+/// Verify that an API Server client can be created with the default port (47099)
 #[test]
-fn test_api_client_creation_port_47099() {
+fn test_api_server_client_default_port() {
     use settingscli::SettingsClient;
 
     let client = SettingsClient::new("http://localhost:47099", 30);
-    assert!(client.is_ok());
+    assert!(
+        client.is_ok(),
+        "API Server client (port 47099) creation must succeed"
+    );
 }
 
-/// Test that dual clients can be created from the same base URL with different ports
+/// Verify the dual-client pattern: two independent clients from the same base URL
+/// but different ports, as required by the routing implementation.
 #[test]
-fn test_dual_client_creation() {
+fn test_dual_client_routing_setup() {
     use settingscli::SettingsClient;
 
+    // Same base URL, different ports — this is the routing pattern used in main.rs
     let base_url = "http://localhost";
     let settings_url = format!("{}:{}", base_url, 8080);
     let api_url = format!("{}:{}", base_url, 47099);
@@ -55,77 +64,65 @@ fn test_dual_client_creation() {
 
     assert!(
         settings_client.is_ok(),
-        "SettingsService client creation failed"
+        "SettingsService client (port 8080) must be created successfully"
     );
-    assert!(api_client.is_ok(), "API Server client creation failed");
+    assert!(
+        api_client.is_ok(),
+        "API Server client (port 47099) must be created successfully"
+    );
 }
 
-/// Test that dual clients are independent (different ports from same base URL)
+/// Verify that URL construction from base + port matches the expected format.
+/// This mirrors what main.rs does: format!("{}:{}", cli.url, cli.settings_port)
 #[test]
-fn test_dual_client_independence() {
-    use settingscli::SettingsClient;
+fn test_url_construction_from_base_and_port() {
+    let base_url = "http://localhost";
 
-    // Use 192.0.2.1 (TEST-NET-1, RFC 5737) as a clearly non-routable test address
-    let base_url = "http://192.0.2.1";
     let settings_url = format!("{}:{}", base_url, 8080);
     let api_url = format!("{}:{}", base_url, 47099);
 
-    // Both clients should be created successfully even on remote hosts
-    assert!(
-        SettingsClient::new(&settings_url, 30).is_ok(),
-        "SettingsService client for remote host failed"
+    assert_eq!(
+        settings_url, "http://localhost:8080",
+        "SettingsService URL must be base:8080"
     );
-    assert!(
-        SettingsClient::new(&api_url, 30).is_ok(),
-        "API Server client for remote host failed"
+    assert_eq!(
+        api_url, "http://localhost:47099",
+        "API Server URL must be base:47099"
     );
 }
 
-/// Test that URL construction follows the expected format
-#[test]
-fn test_url_construction_format() {
-    let base_url = "http://localhost";
-    let settings_port: u16 = 8080;
-    let api_port: u16 = 47099;
-
-    let settings_url = format!("{}:{}", base_url, settings_port);
-    let api_url = format!("{}:{}", base_url, api_port);
-
-    assert_eq!(settings_url, "http://localhost:8080");
-    assert_eq!(api_url, "http://localhost:47099");
-}
-
-/// Test API health check with unreachable service returns false (not error)
+/// Verify that the API health check endpoint returns false (not an error)
+/// when the API Server is unreachable.
 #[tokio::test]
-async fn test_api_health_check_with_unreachable_service() {
+async fn test_api_health_check_returns_false_when_unreachable() {
     use settingscli::SettingsClient;
 
+    // Use a port that is not in use
     let client = SettingsClient::new("http://localhost:59998", 1).unwrap();
     let result = client.api_health_check().await;
 
     match result {
-        // api_health_check() swallows errors and returns Ok(false) for unreachable services,
-        // but we allow Err(_) as well to be resilient to implementation changes.
-        Ok(false) => {} // Expected: service unreachable
+        Ok(false) => {} // Expected: service unreachable → false
         Err(_) => {}    // Also acceptable
-        Ok(true) => panic!("API health check should not succeed for unreachable service"),
+        Ok(true) => panic!("API health check must not succeed for an unreachable service"),
     }
 }
 
-/// Test settings health check with unreachable service returns false (not error)
+/// Verify that the SettingsService health check endpoint returns false (not an error)
+/// when SettingsService is unreachable.
 #[tokio::test]
-async fn test_settings_health_check_with_unreachable_service() {
+async fn test_settings_health_check_returns_false_when_unreachable() {
     use settingscli::SettingsClient;
 
+    // Use a port that is not in use
     let client = SettingsClient::new("http://localhost:59997", 1).unwrap();
     let result = client.health_check().await;
 
     match result {
-        Ok(false) => {} // Expected: service unreachable
+        Ok(false) => {} // Expected: service unreachable → false
         Err(_) => {}    // Also acceptable
-        Ok(true) => panic!("Settings health check should not succeed for unreachable service"),
+        Ok(true) => {
+            panic!("SettingsService health check must not succeed for an unreachable service")
+        }
     }
 }
-
-// Note: More comprehensive CLI argument parsing tests would require
-// exposing the CLI struct from main.rs or restructuring the code

@@ -1,7 +1,7 @@
 /*
-* SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
-* SPDX-License-Identifier: Apache-2.0
-*/
+ * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 use crate::commands::{print_error, print_info, print_success};
 use crate::{Result, SettingsClient};
 use clap::Subcommand;
@@ -216,7 +216,6 @@ mod tests {
 
     #[test]
     fn test_validate_multi_document_yaml_all_kinds() {
-        // Multi-document YAML with all required kinds
         let yaml = "---\nkind: Scenario\nname: test-scenario\n---\nkind: Package\nname: test-package\n---\nkind: Model\nname: test-model\n";
         let result = validate_yaml_artifact(yaml);
         assert!(
@@ -227,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_validate_multi_document_yaml_missing_kinds() {
-        // Multi-document YAML with missing kinds should still return Ok (only warns)
+        // Missing kinds should produce a warning but not fail
         let yaml = "---\nkind: Scenario\nname: test-scenario\n";
         let result = validate_yaml_artifact(yaml);
         assert!(
@@ -238,9 +237,7 @@ mod tests {
 
     #[test]
     fn test_validate_empty_yaml() {
-        // Empty YAML should be accepted (no "---")
-        let yaml = "";
-        let result = validate_yaml_artifact(yaml);
+        let result = validate_yaml_artifact("");
         assert!(result.is_ok(), "Empty YAML should be accepted");
     }
 
@@ -251,14 +248,15 @@ mod tests {
         let err_msg = format!("{}", result.unwrap_err());
         assert!(
             err_msg.contains("File not found"),
-            "Error message should mention 'File not found'"
+            "Error message should mention 'File not found', got: {}",
+            err_msg
         );
     }
 
     #[test]
     fn test_read_yaml_content_existing_file() {
         let content = "kind: Scenario\nname: test\n";
-        let tmp_path = "/tmp/settingscli_test_yaml.yaml";
+        let tmp_path = "/tmp/settingscli_test_yaml_validation.yaml";
         fs::write(tmp_path, content).expect("Failed to write temp file");
 
         let result = read_yaml_content(tmp_path);
