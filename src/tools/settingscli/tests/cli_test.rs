@@ -60,6 +60,40 @@ fn test_dual_client_creation() {
     assert!(api_client.is_ok(), "API Server client creation failed");
 }
 
+/// Test that dual clients are independent (different ports from same base URL)
+#[test]
+fn test_dual_client_independence() {
+    use settingscli::SettingsClient;
+
+    let base_url = "http://10.231.178.2";
+    let settings_url = format!("{}:{}", base_url, 8080);
+    let api_url = format!("{}:{}", base_url, 47099);
+
+    // Both clients should be created successfully even on remote hosts
+    assert!(
+        SettingsClient::new(&settings_url, 30).is_ok(),
+        "SettingsService client for remote host failed"
+    );
+    assert!(
+        SettingsClient::new(&api_url, 30).is_ok(),
+        "API Server client for remote host failed"
+    );
+}
+
+/// Test that URL construction follows the expected format
+#[test]
+fn test_url_construction_format() {
+    let base_url = "http://localhost";
+    let settings_port: u16 = 8080;
+    let api_port: u16 = 47099;
+
+    let settings_url = format!("{}:{}", base_url, settings_port);
+    let api_url = format!("{}:{}", base_url, api_port);
+
+    assert_eq!(settings_url, "http://localhost:8080");
+    assert_eq!(api_url, "http://localhost:47099");
+}
+
 /// Test API health check with unreachable service returns false (not error)
 #[tokio::test]
 async fn test_api_health_check_with_unreachable_service() {
@@ -74,6 +108,21 @@ async fn test_api_health_check_with_unreachable_service() {
         Ok(false) => {} // Expected: service unreachable
         Err(_) => {}    // Also acceptable
         Ok(true) => panic!("API health check should not succeed for unreachable service"),
+    }
+}
+
+/// Test settings health check with unreachable service returns false (not error)
+#[tokio::test]
+async fn test_settings_health_check_with_unreachable_service() {
+    use settingscli::SettingsClient;
+
+    let client = SettingsClient::new("http://localhost:59997", 1).unwrap();
+    let result = client.health_check().await;
+
+    match result {
+        Ok(false) => {} // Expected: service unreachable
+        Err(_) => {}    // Also acceptable
+        Ok(true) => panic!("Settings health check should not succeed for unreachable service"),
     }
 }
 

@@ -73,7 +73,7 @@ async fn apply_yaml(client: &SettingsClient, file_path: &str) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to apply YAML artifact: {}", e));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
@@ -123,7 +123,7 @@ async fn withdraw_yaml(client: &SettingsClient, file_path: &str) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to withdraw YAML artifact: {}", e));
-            return Err(e.into());
+            return Err(e);
         }
     }
 
@@ -139,7 +139,10 @@ fn read_yaml_content(file_path: &str) -> Result<String> {
         Ok(buffer)
     } else {
         if !Path::new(file_path).exists() {
-            return Err(crate::CliError::Custom(format!("File not found: {}", file_path)).into());
+            return Err(crate::CliError::Custom(format!(
+                "File not found: {}",
+                file_path
+            )));
         }
         let content = fs::read_to_string(file_path)?;
         Ok(content)
@@ -177,7 +180,7 @@ fn validate_yaml_artifact(yaml_content: &str) -> Result<()> {
     }
 
     // Warn about missing kinds but don't fail
-    let required_kinds = vec!["Scenario", "Package", "Model"];
+    let required_kinds = ["Scenario", "Package", "Model"];
     let missing_kinds: Vec<&str> = required_kinds
         .iter()
         .filter(|&&kind| !found_kinds.contains(kind))
@@ -196,4 +199,72 @@ fn validate_yaml_artifact(yaml_content: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_validate_single_document_yaml() {
+        // Single document YAML (no "---") should be accepted with info message
+        let yaml = "kind: Scenario\nname: test";
+        let result = validate_yaml_artifact(yaml);
+        assert!(result.is_ok(), "Single document YAML should be accepted");
+    }
+
+    #[test]
+    fn test_validate_multi_document_yaml_all_kinds() {
+        // Multi-document YAML with all required kinds
+        let yaml = "---\nkind: Scenario\nname: test-scenario\n---\nkind: Package\nname: test-package\n---\nkind: Model\nname: test-model\n";
+        let result = validate_yaml_artifact(yaml);
+        assert!(
+            result.is_ok(),
+            "Valid multi-document YAML should be accepted"
+        );
+    }
+
+    #[test]
+    fn test_validate_multi_document_yaml_missing_kinds() {
+        // Multi-document YAML with missing kinds should still return Ok (only warns)
+        let yaml = "---\nkind: Scenario\nname: test-scenario\n";
+        let result = validate_yaml_artifact(yaml);
+        assert!(
+            result.is_ok(),
+            "Missing kinds should produce warning, not error"
+        );
+    }
+
+    #[test]
+    fn test_validate_empty_yaml() {
+        // Empty YAML should be accepted (no "---")
+        let yaml = "";
+        let result = validate_yaml_artifact(yaml);
+        assert!(result.is_ok(), "Empty YAML should be accepted");
+    }
+
+    #[test]
+    fn test_read_yaml_content_nonexistent_file() {
+        let result = read_yaml_content("/nonexistent/path/to/file.yaml");
+        assert!(result.is_err(), "Reading nonexistent file should fail");
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("File not found"),
+            "Error message should mention 'File not found'"
+        );
+    }
+
+    #[test]
+    fn test_read_yaml_content_existing_file() {
+        let content = "kind: Scenario\nname: test\n";
+        let tmp_path = "/tmp/settingscli_test_yaml.yaml";
+        fs::write(tmp_path, content).expect("Failed to write temp file");
+
+        let result = read_yaml_content(tmp_path);
+        let _ = fs::remove_file(tmp_path);
+
+        assert!(result.is_ok(), "Reading existing file should succeed");
+        assert_eq!(result.unwrap(), content);
+    }
 }
