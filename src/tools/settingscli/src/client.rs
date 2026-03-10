@@ -113,15 +113,23 @@ impl SettingsClient {
 
     /// Check if the SettingsService is reachable
     pub async fn health_check(&self) -> Result<bool> {
-        match self.get("/api/v1/system/health").await {
+        if self.check_health_endpoint("/api/v1/system/health").await? {
+            return Ok(true);
+        }
+        // Try alternative health check endpoint
+        self.check_health_endpoint("/api/v1/health").await
+    }
+
+    /// Check if the API Server is reachable
+    pub async fn api_health_check(&self) -> Result<bool> {
+        self.check_health_endpoint("/api/health").await
+    }
+
+    /// Internal helper: check a single health endpoint
+    async fn check_health_endpoint(&self, endpoint: &str) -> Result<bool> {
+        match self.get(endpoint).await {
             Ok(_) => Ok(true),
-            Err(_) => {
-                // Try alternative health check endpoint
-                match self.get("/api/v1/health").await {
-                    Ok(_) => Ok(true),
-                    Err(_) => Ok(false),
-                }
-            }
+            Err(_) => Ok(false),
         }
     }
 

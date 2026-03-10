@@ -32,6 +32,20 @@ async fn test_health_check_with_unreachable_service() {
     }
 }
 
+#[tokio::test]
+async fn test_api_health_check_with_unreachable_service() {
+    // Use a port that's unlikely to be in use
+    let client = SettingsClient::new("http://localhost:59998", 1).unwrap();
+    let result = client.api_health_check().await;
+
+    // Should return false when API Server is unreachable
+    match result {
+        Ok(false) => {} // Expected
+        Err(_) => {}    // Also acceptable
+        Ok(true) => panic!("API health check should not succeed for unreachable service"),
+    }
+}
+
 // Note: The following tests require a running SettingsService
 // They are commented out by default and can be enabled for integration testing
 

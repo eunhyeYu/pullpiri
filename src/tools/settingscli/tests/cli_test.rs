@@ -23,5 +23,23 @@ fn test_client_creation() {
     assert!(client.is_ok());
 }
 
+#[test]
+fn test_settings_client_creation() {
+    use settingscli::SettingsClient;
+
+    // SettingsService client uses port 8080
+    let client = SettingsClient::new("http://localhost:8080", 30);
+    assert!(client.is_ok());
+}
+
+#[test]
+fn test_api_client_creation() {
+    use settingscli::SettingsClient;
+
+    // API Server client uses port 47099
+    let client = SettingsClient::new("http://localhost:47099", 30);
+    assert!(client.is_ok());
+}
+
 // Note: More comprehensive CLI argument parsing tests would require
 // exposing the CLI struct from main.rs or restructuring the code
