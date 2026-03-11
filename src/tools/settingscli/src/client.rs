@@ -48,8 +48,7 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
-        Ok(json)
+        parse_response_body(response).await
     }
 
     /// Make a POST request to the specified endpoint
@@ -68,8 +67,7 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
-        Ok(json)
+        parse_response_body(response).await
     }
 
     /// Make a PUT request to the specified endpoint
@@ -88,8 +86,7 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
-        Ok(json)
+        parse_response_body(response).await
     }
 
     /// Make a DELETE request to the specified endpoint
@@ -107,8 +104,7 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
-        Ok(json)
+        parse_response_body(response).await
     }
 
     /// Check if the SettingsService is reachable
@@ -128,7 +124,7 @@ impl SettingsClient {
     /// Apply YAML artifact (POST with text/plain content)
     ///
     /// # Arguments
-    /// * `endpoint` - API endpoint (e.g., "/api/v1/yaml")
+    /// * `endpoint` - API endpoint (e.g., "/api/artifact")
     /// * `yaml_content` - YAML content as string
     pub async fn post_yaml(&self, endpoint: &str, yaml_content: &str) -> Result<Value> {
         let url = format!("{}{}", self.base_url, endpoint);
@@ -152,14 +148,13 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
-        Ok(json)
+        parse_response_body(response).await
     }
 
     /// Withdraw YAML artifact (DELETE with text/plain content)
     ///
     /// # Arguments
-    /// * `endpoint` - API endpoint (e.g., "/api/v1/yaml")
+    /// * `endpoint` - API endpoint (e.g., "/api/artifact")
     /// * `yaml_content` - YAML content as string
     pub async fn delete_yaml(&self, endpoint: &str, yaml_content: &str) -> Result<Value> {
         let url = format!("{}{}", self.base_url, endpoint);
@@ -183,7 +178,19 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
-        Ok(json)
+        parse_response_body(response).await
+    }
+}
+
+/// Parse a successful HTTP response body as JSON.
+///
+/// Returns `Value::Null` for an empty body (e.g. `200 OK` with no content),
+/// and deserialises normally otherwise.
+async fn parse_response_body(response: reqwest::Response) -> Result<Value> {
+    let bytes = response.bytes().await?;
+    if bytes.is_empty() {
+        Ok(Value::Null)
+    } else {
+        Ok(serde_json::from_slice(&bytes)?)
     }
 }
