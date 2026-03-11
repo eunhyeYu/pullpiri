@@ -18,9 +18,17 @@ use settingscli::{Result, SettingsClient};
 #[command(version)]
 #[command(long_about = None)]
 struct Cli {
-    /// SettingsService URL
-    #[arg(short, long, default_value = "http://localhost:8080")]
+    /// Base URL (host only, without port)
+    #[arg(short, long, env = "PICCOLO_URL", default_value = "http://localhost")]
     url: String,
+
+    /// SettingsService port
+    #[arg(long, env = "SETTINGS_PORT", default_value = "8080")]
+    settings_port: u16,
+
+    /// API Server port
+    #[arg(long, env = "API_PORT", default_value = "47099")]
+    api_port: u16,
 
     /// Request timeout in seconds
     #[arg(short, long, default_value = "30")]
@@ -74,32 +82,50 @@ enum Commands {
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
+    // Strip any port that may have been included in the base URL, then attach the correct ports
+    let base_host = strip_port(&cli.url);
+    let settings_url = format!("{}:{}", base_host, cli.settings_port);
+    let api_url = format!("{}:{}", base_host, cli.api_port);
+
     if cli.verbose {
         println!(
-            "{} Connecting to SettingsService at: {}",
+            "{} SettingsService URL: {}",
             "ℹ".blue().bold(),
-            cli.url
+            settings_url
         );
+        println!("{} API Server URL: {}", "ℹ".blue().bold(), api_url);
     }
 
-    // Create client
-    let client = match SettingsClient::new(&cli.url, cli.timeout) {
+    // Create two clients: one for SettingsService, one for API Server
+    let settings_client = match SettingsClient::new(&settings_url, cli.timeout) {
         Ok(client) => client,
         Err(e) => {
-            eprintln!("{} Failed to create client: {}", "✗".red().bold(), e);
+            eprintln!(
+                "{} Failed to create settings client: {}",
+                "✗".red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
 
-    // Execute command
+    let api_client = match SettingsClient::new(&api_url, cli.timeout) {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("{} Failed to create API client: {}", "✗".red().bold(), e);
+            std::process::exit(1);
+        }
+    };
+
+    // Execute command – YAML commands go directly to API Server; others go to SettingsService
     let result = match cli.command {
-        Commands::Metrics { action } => metrics::handle(&client, action).await,
-        Commands::Board { action } => board::handle(&client, action).await,
-        Commands::Node { action } => node::handle(&client, action).await,
-        Commands::Soc { action } => soc::handle(&client, action).await,
-        Commands::Container { action } => container::handle(&client, action).await,
-        Commands::Yaml { action } => yaml::handle(&client, action).await,
-        Commands::Health => health_check(&client).await,
+        Commands::Metrics { action } => metrics::handle(&settings_client, action).await,
+        Commands::Board { action } => board::handle(&settings_client, action).await,
+        Commands::Node { action } => node::handle(&settings_client, action).await,
+        Commands::Soc { action } => soc::handle(&settings_client, action).await,
+        Commands::Container { action } => container::handle(&settings_client, action).await,
+        Commands::Yaml { action } => yaml::handle(&api_client, action).await,
+        Commands::Health => health_check(&settings_client).await,
     };
 
     match result {
@@ -115,6 +141,25 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+/// Strip any port number from a URL, leaving only scheme + host
+fn strip_port(url: &str) -> String {
+    // Handle URLs like "http://host:port" or "http://host"
+    if let Some(scheme_end) = url.find("://") {
+        let scheme = &url[..scheme_end + 3];
+        let rest = &url[scheme_end + 3..];
+        // Remove port if present (everything after the last ':' that is pure digits)
+        if let Some(colon_pos) = rest.rfind(':') {
+            let after_colon = &rest[colon_pos + 1..];
+            if after_colon.chars().all(|c| c.is_ascii_digit()) {
+                return format!("{}{}", scheme, &rest[..colon_pos]);
+            }
+        }
+        url.to_string()
+    } else {
+        url.to_string()
+    }
 }
 
 /// Perform a health check on the SettingsService
@@ -141,4 +186,29 @@ async fn health_check(client: &SettingsClient) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_strip_port_removes_port() {
+        assert_eq!(strip_port("http://localhost:8080"), "http://localhost");
+        assert_eq!(strip_port("http://10.0.0.1:47099"), "http://10.0.0.1");
+    }
+
+    #[test]
+    fn test_strip_port_no_port_unchanged() {
+        assert_eq!(strip_port("http://localhost"), "http://localhost");
+        assert_eq!(strip_port("http://10.0.0.1"), "http://10.0.0.1");
+    }
+
+    #[test]
+    fn test_strip_port_builds_correct_urls() {
+        let url = "http://10.231.178.2:9999";
+        let base = strip_port(url);
+        assert_eq!(format!("{}:{}", base, 8080), "http://10.231.178.2:8080");
+        assert_eq!(format!("{}:{}", base, 47099), "http://10.231.178.2:47099");
+    }
 }

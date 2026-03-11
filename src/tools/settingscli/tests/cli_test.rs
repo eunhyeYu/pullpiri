@@ -25,3 +25,18 @@ fn test_client_creation() {
 
 // Note: More comprehensive CLI argument parsing tests would require
 // exposing the CLI struct from main.rs or restructuring the code
+
+/// Verify that two independent clients can be created with different URLs,
+/// matching the dual-client (settings_client + api_client) routing design.
+#[test]
+fn test_dual_client_creation() {
+    use settingscli::SettingsClient;
+
+    let settings_client = SettingsClient::new("http://localhost:8080", 30);
+    let api_client = SettingsClient::new("http://localhost:47099", 30);
+    assert!(
+        settings_client.is_ok(),
+        "settings_client creation should succeed"
+    );
+    assert!(api_client.is_ok(), "api_client creation should succeed");
+}
