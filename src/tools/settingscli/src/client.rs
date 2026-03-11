@@ -48,7 +48,12 @@ impl SettingsClient {
             )));
         }
 
-        let json: Value = response.json().await?;
+        let bytes = response.bytes().await?;
+        let json = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes)?
+        };
         Ok(json)
     }
 
@@ -128,7 +133,7 @@ impl SettingsClient {
     /// Apply YAML artifact (POST with text/plain content)
     ///
     /// # Arguments
-    /// * `endpoint` - API endpoint (e.g., "/api/v1/yaml")
+    /// * `endpoint` - API endpoint (e.g., "/api/artifact")
     /// * `yaml_content` - YAML content as string
     pub async fn post_yaml(&self, endpoint: &str, yaml_content: &str) -> Result<Value> {
         let url = format!("{}{}", self.base_url, endpoint);
@@ -159,7 +164,7 @@ impl SettingsClient {
     /// Withdraw YAML artifact (DELETE with text/plain content)
     ///
     /// # Arguments
-    /// * `endpoint` - API endpoint (e.g., "/api/v1/yaml")
+    /// * `endpoint` - API endpoint (e.g., "/api/artifact")
     /// * `yaml_content` - YAML content as string
     pub async fn delete_yaml(&self, endpoint: &str, yaml_content: &str) -> Result<Value> {
         let url = format!("{}{}", self.base_url, endpoint);
