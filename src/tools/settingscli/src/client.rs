@@ -48,7 +48,13 @@ impl SettingsClient {
             )));
         }
 
-        parse_response_body(response).await
+        let bytes = response.bytes().await?;
+        let json = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes)?
+        };
+        Ok(json)
     }
 
     /// Make a POST request to the specified endpoint
@@ -67,7 +73,8 @@ impl SettingsClient {
             )));
         }
 
-        parse_response_body(response).await
+        let json: Value = response.json().await?;
+        Ok(json)
     }
 
     /// Make a PUT request to the specified endpoint
@@ -86,7 +93,8 @@ impl SettingsClient {
             )));
         }
 
-        parse_response_body(response).await
+        let json: Value = response.json().await?;
+        Ok(json)
     }
 
     /// Make a DELETE request to the specified endpoint
@@ -104,7 +112,8 @@ impl SettingsClient {
             )));
         }
 
-        parse_response_body(response).await
+        let json: Value = response.json().await?;
+        Ok(json)
     }
 
     /// Check if the SettingsService is reachable
@@ -148,7 +157,8 @@ impl SettingsClient {
             )));
         }
 
-        parse_response_body(response).await
+        let json: Value = response.json().await?;
+        Ok(json)
     }
 
     /// Withdraw YAML artifact (DELETE with text/plain content)
@@ -178,19 +188,7 @@ impl SettingsClient {
             )));
         }
 
-        parse_response_body(response).await
-    }
-}
-
-/// Parse a successful HTTP response body as JSON.
-///
-/// Returns `Value::Null` for an empty body (e.g. `200 OK` with no content),
-/// and deserialises normally otherwise.
-async fn parse_response_body(response: reqwest::Response) -> Result<Value> {
-    let bytes = response.bytes().await?;
-    if bytes.is_empty() {
-        Ok(Value::Null)
-    } else {
-        Ok(serde_json::from_slice(&bytes)?)
+        let json: Value = response.json().await?;
+        Ok(json)
     }
 }
