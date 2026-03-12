@@ -92,6 +92,68 @@ async fn notify_scenario_state(scenario_name: &str, target_state: &str) {
     }
 }
 
+/// Send network resource to ResourceManager
+async fn send_network_to_resourcemanager(network: &Network) {
+    use common::resourcemanager::NetworkResourceRequest;
+
+    let spec = network.get_spec();
+    let request = NetworkResourceRequest {
+        network_name: spec.get_network_name().to_string(),
+        network_mode: spec.get_network_mode().as_str().to_string(),
+        node_name: String::new(),
+    };
+
+    logd!(1, "🌐 NETWORK RESOURCE: Sending to ResourceManager");
+    logd!(1, "   📋 Network Name: {}", &request.network_name);
+    logd!(1, "   🔧 Network Mode: {}", &request.network_mode);
+
+    let mut sender = crate::grpc::sender::resourcemanager::ResourceManagerSender::new();
+    match sender.create_network(request).await {
+        Ok(response) => {
+            let resp = response.into_inner();
+            if resp.success {
+                logd!(1, "   ✅ Successfully created network resource");
+            } else {
+                logd!(5, "   ⚠️ Network resource creation failed: {}", resp.message);
+            }
+        }
+        Err(e) => logd!(5, "   ❌ Failed to send network to ResourceManager: {:?}", e),
+    }
+}
+
+/// Send volume resource to ResourceManager
+async fn send_volume_to_resourcemanager(volume: &Volume) {
+    use common::resourcemanager::VolumeResourceRequest;
+
+    let spec = volume.get_spec();
+    let request = VolumeResourceRequest {
+        volume_name: spec.get_volume_name().to_string(),
+        capacity: spec.get_capacity().to_string(),
+        mountpath: spec.get_mount_path().to_string(),
+        asil_level: spec.get_asil_level().as_str().to_string(),
+        node_name: String::new(),
+    };
+
+    logd!(1, "💾 VOLUME RESOURCE: Sending to ResourceManager");
+    logd!(1, "   📋 Volume Name: {}", &request.volume_name);
+    logd!(1, "   📦 Capacity: {}", &request.capacity);
+    logd!(1, "   📁 Mount Path: {}", &request.mountpath);
+    logd!(1, "   🛡️ ASIL Level: {}", &request.asil_level);
+
+    let mut sender = crate::grpc::sender::resourcemanager::ResourceManagerSender::new();
+    match sender.create_volume(request).await {
+        Ok(response) => {
+            let resp = response.into_inner();
+            if resp.success {
+                logd!(1, "   ✅ Successfully created volume resource");
+            } else {
+                logd!(5, "   ⚠️ Volume resource creation failed: {}", resp.message);
+            }
+        }
+        Err(e) => logd!(5, "   ❌ Failed to send volume to ResourceManager: {:?}", e),
+    }
+}
+
 /// Process and store a single artifact document
 async fn process_artifact_document(doc: &str) -> common::Result<Option<(String, String)>> {
     use std::time::Instant;
@@ -124,8 +186,22 @@ async fn process_artifact_document(doc: &str) -> common::Result<Option<(String, 
         etcd_start.elapsed()
     );
 
-    if kind == KIND_SCENARIO {
-        notify_scenario_state(&name, "idle").await;
+    // Handle artifact-specific actions
+    match kind.as_str() {
+        KIND_SCENARIO => {
+            notify_scenario_state(&name, "idle").await;
+        }
+        KIND_NETWORK => {
+            if let Ok(network) = serde_yaml::from_value::<Network>(value) {
+                send_network_to_resourcemanager(&network).await;
+            }
+        }
+        KIND_VOLUME => {
+            if let Ok(volume) = serde_yaml::from_value::<Volume>(value) {
+                send_volume_to_resourcemanager(&volume).await;
+            }
+        }
+        _ => {}
     }
 
     Ok(Some((kind, artifact_str)))
