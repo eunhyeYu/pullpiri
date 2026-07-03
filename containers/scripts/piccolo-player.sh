@@ -36,6 +36,8 @@ podman run -d \
   --pod piccolo-player \
   --name piccolo-actioncontroller \
   -e ROCKSDB_SERVICE_URL="http://${MASTER_IP}:47007" \
+  -e ACTIONCONTROLLER_WORKLOAD_RUNTIME="lifecycle" \
+  -e LIFECYCLE_GRPC_ENDPOINT="http://127.0.0.1:50051" \
   -v /etc/piccolo/settings.yaml:/etc/piccolo/settings.yaml:Z \
   -v /run/piccololog/:/run/piccololog/ \
   ${CONTAINER_IMAGE} \

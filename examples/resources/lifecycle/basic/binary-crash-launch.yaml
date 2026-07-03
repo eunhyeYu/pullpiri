@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Copyright 2026 LG Electronics Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: Scenario
+metadata:
+  name: binary-crash-launch
+spec:
+  condition: null
+  action: launch
+  target: binary-crash
+---
+apiVersion: v1
+kind: Package
+metadata:
+  label: null
+  name: binary-crash
+spec:
+  pattern:
+    - type: plain
+  models: []
+  binaries:
+    - name: binary-crash-main
+      node: lge-NUC15CRSU9
+---
+apiVersion: v1
+kind: Binary
+metadata:
+  name: binary-crash-main
+spec:
+  path: /bin/sh
+  args: ["-c", "exit 1"]
+  restartPolicy: OnFailure
+  maxRetries: 3
+  restartDelaySecs: 1
+  node: lge-NUC15CRSU9

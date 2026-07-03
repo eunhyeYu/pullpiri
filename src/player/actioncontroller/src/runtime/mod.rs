@@ -3,6 +3,7 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 pub mod nodeagent;
+pub mod lifecycle;
 
 /// Initialize the runtime module for workload operations
 ///

@@ -2,6 +2,7 @@
 * SPDX-FileCopyrightText: Copyright 2024 LG Electronics Inc.
 * SPDX-License-Identifier: Apache-2.0
 */
+pub mod binary;
 pub mod model;
 pub mod network;
 pub mod node;
@@ -82,6 +83,14 @@ pub struct Policy {
     kind: String,
     metadata: MetaData,
     spec: policy::PolicySpec,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Binary {
+    apiVersion: String,
+    kind: String,
+    metadata: MetaData,
+    spec: binary::BinarySpec,
 }
 
 //Unit Test Cases

@@ -16,6 +16,10 @@ impl Package {
         &self.spec.models
     }
 
+    pub fn get_binaries(&self) -> &[BinaryInfo] {
+        self.spec.binaries.as_deref().unwrap_or(&[])
+    }
+
     pub fn get_schedule(&self) -> &Option<String> {
         &self.spec.schedule
     }
@@ -31,6 +35,8 @@ pub struct PackageSpec {
     policy: Option<String>,
     pattern: Vec<Pattern>,
     models: Vec<ModelInfo>,
+    #[serde(default)]
+    binaries: Option<Vec<BinaryInfo>>,
 }
 
 #[derive(Debug, serde::Deserialize, PartialEq)]
@@ -71,6 +77,23 @@ impl Resource {
     }
     pub fn get_network(&self) -> Option<String> {
         self.network.clone()
+    }
+}
+
+/// Binary reference in a Package spec
+#[derive(Debug, serde::Deserialize, PartialEq)]
+pub struct BinaryInfo {
+    name: String,
+    node: String,
+}
+
+impl BinaryInfo {
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_node(&self) -> String {
+        self.node.clone()
     }
 }
 

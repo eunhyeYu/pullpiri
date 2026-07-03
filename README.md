@@ -51,6 +51,19 @@ runtime and systemd.
 
 Refer to [Getting Started](/doc/docs/getting-started.md).
 
+## Testing
+
+### Lifecycle Integration Test
+
+To test the complete Pullpiri workflow with Lifecycle adapter:
+
+```bash
+# Run integration test
+/home/lge/Desktop/pullpiri/examples/lifecycle-test.sh
+```
+
+For details, see [Lifecycle Test Resources](/examples/resources/lifecycle/README.md).
+
 ## Development
 
 Refer to [Development](/doc/docs/developments.md).

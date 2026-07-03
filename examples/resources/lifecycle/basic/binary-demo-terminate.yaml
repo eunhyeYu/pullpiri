@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: Copyright 2026 LG Electronics Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: Scenario
+metadata:
+  name: binary-demo-terminate
+spec:
+  condition: null
+  action: terminate
+  target: binary-demo
+---
+apiVersion: v1
+kind: Package
+metadata:
+  label: null
+  name: binary-demo
+spec:
+  pattern:
+    - type: plain
+  models: []
+  binaries:
+    - name: binary-demo-main
+      node: lge-NUC15CRSU9
+---
+apiVersion: v1
+kind: Binary
+metadata:
+  name: binary-demo-main
+spec:
+  path: /bin/sleep
+  args: ["300"]
+  restartPolicy: Never
+  maxRetries: 0
+  restartDelaySecs: 0
+  node: lge-NUC15CRSU9

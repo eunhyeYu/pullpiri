@@ -10,7 +10,7 @@ use common::logd;
 use common::{
     actioncontroller::PodStatus as Status,
     spec::artifact::{
-        package::ModelInfo, schedule::SchedPolicy, Artifact, Package, Scenario, Schedule,
+        package::ModelInfo, schedule::SchedPolicy, Artifact, Binary, Package, Scenario, Schedule,
     },
     statemanager::{ResourceType, StateChange},
     Result,
@@ -25,10 +25,25 @@ const ETCD_NODE_PREFIX: &str = "Node";
 const ETCD_NODES_PREFIX: &str = "nodes";
 const ETCD_SCHED_PREFIX: &str = "Schedule";
 const ETCD_CLUSTER_NODES_PREFIX: &str = "cluster/nodes";
+const ETCD_BINARY_PREFIX: &str = "Binary";
 
 // Node types
 const NODE_TYPE_NODEAGENT: &str = "nodeagent";
 const NODE_ROLE_NODEAGENT: i32 = 2;
+
+fn should_use_lifecycle_runtime(node_type: &str) -> bool {
+    if matches!(node_type, "lifecycle" | "kyron" | "orchestrator") {
+        return true;
+    }
+
+    match std::env::var("ACTIONCONTROLLER_WORKLOAD_RUNTIME") {
+        Ok(mode) => {
+            let normalized = mode.trim().to_ascii_lowercase();
+            matches!(normalized.as_str(), "lifecycle" | "kyron" | "orchestrator")
+        }
+        Err(_) => false,
+    }
+}
 
 /// Manager for coordinating scenario actions and workload operations
 ///
@@ -340,6 +355,29 @@ impl ActionControllerManager {
             .map_err(|e| format!("Failed to serialize pod YAML: {}", e).into())
     }
 
+    /// Execute action on a Binary artifact
+    async fn execute_binary_action(&self, action: &str, binary: &Binary) -> Result<()> {
+        let binary_name = binary.get_name();
+        logd!(2, "Executing Binary action: {} on {}", action, binary_name);
+
+        match action {
+            "launch" => {
+                crate::runtime::lifecycle::start_binary_artifact(binary).await?;
+            }
+            "terminate" => {
+                crate::runtime::lifecycle::stop_binary_artifact(binary).await?;
+            }
+            "update" | "rollback" => {
+                crate::runtime::lifecycle::restart_binary_artifact(binary).await?;
+            }
+            _ => {
+                logd!(4, "Unknown Binary action: {}", action);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Handle realtime scheduling for a model
     async fn handle_realtime_sched(&self, sched: &str) -> Result<()> {
         use common::external::timpani::{SchedInfo, TaskInfo};
@@ -426,6 +464,16 @@ impl ActionControllerManager {
         node_name: &str,
         node_type: &str,
     ) -> Result<()> {
+        if should_use_lifecycle_runtime(node_type) {
+            match operation {
+                "start" => crate::runtime::lifecycle::start_workload(pod).await?,
+                "stop" => crate::runtime::lifecycle::stop_workload(pod).await?,
+                "restart" => crate::runtime::lifecycle::restart_workload(pod).await?,
+                _ => return Err(format!("Unknown operation '{}'", operation).into()),
+            }
+            return Ok(());
+        }
+
         match node_type {
             NODE_TYPE_NODEAGENT => match operation {
                 "start" => crate::runtime::nodeagent::start_workload(pod, node_name).await?,
@@ -597,6 +645,44 @@ impl ActionControllerManager {
 
         if let Some(sched) = package.get_schedule() {
             self.handle_realtime_sched(sched).await?;
+        }
+
+        // Process Binary artifacts if present
+        for bi in package.get_binaries() {
+            let binary_name = bi.get_name();
+            let binary_node = bi.get_node();
+
+            logd!(
+                2,
+                "Processing binary '{}' on node '{}' with action '{}'",
+                binary_name,
+                binary_node,
+                action
+            );
+
+            // Load Binary artifact from etcd
+            match common::etcd::get(&format!("{}/{}", ETCD_BINARY_PREFIX, binary_name)).await {
+                Ok(binary_str) => {
+                    match serde_yaml::from_str::<Binary>(&binary_str) {
+                        Ok(binary) => {
+                            self.execute_binary_action(&action, &binary)
+                                .await
+                                .map_err(|e| {
+                                    format!(
+                                        "Failed to execute action '{}' on binary '{}': {}",
+                                        action, binary_name, e
+                                    )
+                                })?;
+                        }
+                        Err(e) => {
+                            logd!(4, "Failed to parse Binary '{}': {}", binary_name, e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    logd!(4, "Binary '{}' not found in etcd: {}", binary_name, e);
+                }
+            }
         }
 
         self.notify_state_change(scenario_name, "allowed", "completed")

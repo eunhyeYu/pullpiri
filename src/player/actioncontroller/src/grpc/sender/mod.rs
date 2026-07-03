@@ -6,6 +6,7 @@
 //! Running gRPC message sending
 
 pub mod nodeagent;
+pub mod lifecycle;
 pub mod pharos;
 pub mod policymanager;
 pub mod statemanager;
